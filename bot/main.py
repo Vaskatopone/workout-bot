@@ -1,10 +1,12 @@
 import asyncio
 import logging
 
+import uvicorn
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
+from bot.api import create_api
 from bot.config import get_settings
 from bot.database.engine import create_engine, create_session_factory, init_db
 from bot.handlers import setup_routers
@@ -27,8 +29,20 @@ async def main() -> None:
     dispatcher["settings"] = settings
     dispatcher.include_router(setup_routers())
 
+    api = create_api(session_factory)
+    server = uvicorn.Server(
+        uvicorn.Config(
+            api,
+            host=settings.api_host,
+            port=settings.api_port,
+            log_level="info",
+            loop="none",
+        )
+    )
+    server.install_signal_handlers = False
+
     try:
-        await dispatcher.start_polling(bot)
+        await asyncio.gather(dispatcher.start_polling(bot), server.serve())
     finally:
         await engine.dispose()
         await bot.session.close()

@@ -1,27 +1,33 @@
 # workout-bot
 
-Базовый бэкенд Telegram-бота учёта тренировок: aiogram 3, SQLAlchemy 2, SQLite.
+Telegram-бот учёта тренировок: aiogram 3, SQLAlchemy 2, SQLite и Mini App на React + Tailwind.
 
-## Запуск
+## Бэкенд
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-```
-
-В `.env` укажите токен бота и HTTPS-URL WebApp (Telegram принимает только `https://`).
-
-```bash
 python -m bot.main
 ```
 
-Команда `/start` сохраняет пользователя в SQLite и отправляет кнопку открытия WebApp.
+`/start` сохраняет пользователя и открывает WebApp. API слушает порт `8080`.
 
-## Модели
+## WebApp
 
-- `User` — пользователь Telegram
-- `WorkoutPreset` — пресет тренировки
-- `Exercise` — упражнение внутри пресета
-- `WorkoutLog` — лог подхода: дата, вес, повторения
+```bash
+cd webapp
+npm install
+npm run dev
+```
+
+Три вкладки: выбор сплита, запись подходов, история по датам. Тёмная тема Telegram. Если API недоступен, данные сохраняются локально в браузере.
+
+Для продакшена:
+
+```bash
+cd webapp && npm run build
+```
+
+Бот раздаёт `webapp/dist` с того же порта `8080`. В `.env` укажи HTTPS-URL Mini App (`WEBAPP_URL`).
