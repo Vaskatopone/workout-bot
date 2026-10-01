@@ -22,6 +22,12 @@ class PresetCreate(BaseModel):
     exercises: list[str] = Field(min_length=1)
 
 
+class PresetUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    description: str | None = Field(default=None, max_length=512)
+    exercises: list[str] = Field(min_length=1)
+
+
 class SetIn(BaseModel):
     exercise: str = Field(min_length=1, max_length=128)
     weight: float = Field(ge=0)

@@ -2,8 +2,14 @@ import { useState } from "react";
 import { EXERCISE_CATEGORIES } from "../presets.js";
 import { haptic } from "../telegram.js";
 
-export default function PresetsScreen({ builtin, custom, selectedId, onSelect, onCreate }) {
+export default function PresetsScreen({ builtin, custom, selectedId, onSelect, onCreate, onUpdate, onDelete }) {
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  const closeForm = () => {
+    setCreating(false);
+    setEditing(null);
+  };
 
   return (
     <div className="space-y-5">
@@ -16,6 +22,7 @@ export default function PresetsScreen({ builtin, custom, selectedId, onSelect, o
         type="button"
         onClick={() => {
           haptic("light");
+          setEditing(null);
           setCreating(true);
         }}
         className="w-full rounded-2xl bg-tg-button py-3.5 text-[15px] font-semibold text-tg-buttonText"
@@ -23,7 +30,18 @@ export default function PresetsScreen({ builtin, custom, selectedId, onSelect, o
         Создать свой сплит
       </button>
 
-      {creating ? <CreateSplitForm onCancel={() => setCreating(false)} onCreate={onCreate} /> : null}
+      {creating || editing ? (
+        <CreateSplitForm
+          key={editing?.id ?? "new-split"}
+          initialPreset={editing}
+          onCancel={closeForm}
+          onSubmit={async (payload) => {
+            if (editing) await onUpdate(editing, payload);
+            else await onCreate(payload);
+            closeForm();
+          }}
+        />
+      ) : null}
 
       {custom.length > 0 ? (
         <section className="space-y-2">
@@ -34,6 +52,12 @@ export default function PresetsScreen({ builtin, custom, selectedId, onSelect, o
               preset={preset}
               selected={selectedId === preset.id}
               onSelect={onSelect}
+              onEdit={() => setEditing(preset)}
+              onDelete={async () => {
+                const deleted = await onDelete(preset);
+                if (deleted && editing?.id === preset.id) closeForm();
+              }}
+              locked={selectedId === preset.id}
             />
           ))}
         </section>
@@ -54,45 +78,80 @@ export default function PresetsScreen({ builtin, custom, selectedId, onSelect, o
   );
 }
 
-function PresetCard({ preset, selected, onSelect }) {
+function PresetCard({ preset, selected, onSelect, onEdit, onDelete }) {
   return (
-    <button
-      type="button"
-      onClick={() => {
-        haptic("medium");
-        onSelect(preset);
-      }}
-      className={`w-full rounded-2xl bg-tg-section p-4 text-left shadow-card ${
+    <article
+      className={`rounded-2xl bg-tg-section p-4 shadow-card ${
         selected ? "ring-2 ring-tg-button" : ""
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[17px] font-semibold">{preset.name}</div>
-          <div className="mt-0.5 text-sm text-tg-hint">{preset.description}</div>
-        </div>
-        {selected ? (
-          <span className="rounded-full bg-tg-button px-2 py-0.5 text-[11px] font-semibold text-tg-buttonText">
-            Выбран
-          </span>
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            haptic("medium");
+            onSelect(preset);
+          }}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[17px] font-semibold">{preset.name}</div>
+              <div className="mt-0.5 text-sm text-tg-hint">{preset.description}</div>
+            </div>
+            {selected ? (
+              <span className="shrink-0 rounded-full bg-tg-button px-2 py-0.5 text-[11px] font-semibold text-tg-buttonText">
+                Выбран
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {preset.exercises.map((name) => (
+              <span key={name} className="rounded-full bg-black/25 px-2.5 py-1 text-[12px] text-tg-text/90">
+                {name}
+              </span>
+            ))}
+          </div>
+        </button>
+        {onEdit && onDelete ? (
+          <div className="flex shrink-0 flex-col gap-1">
+            <button
+              type="button"
+              aria-label={`Редактировать сплит ${preset.name}`}
+              title={selected ? "Заверши активную тренировку, чтобы изменить сплит" : "Редактировать сплит"}
+              disabled={selected}
+              onClick={() => onEdit(preset)}
+              className="grid h-9 w-9 place-items-center rounded-lg text-tg-hint hover:bg-black/20 hover:text-tg-link disabled:opacity-40"
+            >
+              <EditIcon />
+            </button>
+            <button
+              type="button"
+              aria-label={`Удалить сплит ${preset.name}`}
+              title={selected ? "Заверши активную тренировку, чтобы удалить сплит" : "Удалить сплит"}
+              disabled={selected}
+              onClick={() => onDelete(preset)}
+              className="grid h-9 w-9 place-items-center rounded-lg text-tg-hint hover:bg-black/20 hover:text-tg-destructive disabled:opacity-40"
+            >
+              <DeleteIcon />
+            </button>
+          </div>
         ) : null}
       </div>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {preset.exercises.map((name) => (
-          <span key={name} className="rounded-full bg-black/25 px-2.5 py-1 text-[12px] text-tg-text/90">
-            {name}
-          </span>
-        ))}
-      </div>
-    </button>
+    </article>
   );
 }
 
-function CreateSplitForm({ onCancel, onCreate }) {
-  const [name, setName] = useState("");
+function CreateSplitForm({ initialPreset, onCancel, onSubmit }) {
+  const [name, setName] = useState(initialPreset?.name ?? "");
   const [exercise, setExercise] = useState("");
   const [categoryId, setCategoryId] = useState(EXERCISE_CATEGORIES[0].id);
-  const [exercises, setExercises] = useState([]);
+  const [exercises, setExercises] = useState(() =>
+    (initialPreset?.exercises ?? []).map((item) => ({
+      name: item,
+      image: EXERCISE_CATEGORIES.flatMap((category) => category.exercises).find((entry) => entry.name === item)?.image ?? null,
+    })),
+  );
   const [error, setError] = useState("");
   const category = EXERCISE_CATEGORIES.find((item) => item.id === categoryId);
 
@@ -121,11 +180,21 @@ function CreateSplitForm({ onCancel, onCreate }) {
           setError("Нужны название и хотя бы одно упражнение");
           return;
         }
-        await onCreate({ name: name.trim(), exercises: exercises.map((item) => item.name) });
+        try {
+          const saved = await onSubmit({
+            name: name.trim(),
+            description: initialPreset?.description || "Мой сплит",
+            exercises: exercises.map((item) => item.name),
+          });
+          if (saved === false) return;
+        } catch {
+          setError("Не удалось сохранить сплит. Проверь подключение и попробуй ещё раз.");
+          return;
+        }
         onCancel();
       }}
     >
-      <div className="text-[17px] font-semibold">Новый сплит</div>
+      <div className="text-[17px] font-semibold">{initialPreset ? "Редактировать сплит" : "Новый сплит"}</div>
       <input
         value={name}
         onChange={(event) => setName(event.target.value)}
@@ -238,9 +307,25 @@ function CreateSplitForm({ onCancel, onCreate }) {
           Отмена
         </button>
         <button type="submit" className="flex-1 rounded-xl bg-tg-button py-3 font-semibold text-tg-buttonText">
-          Сохранить
+          {initialPreset ? "Сохранить изменения" : "Сохранить"}
         </button>
       </div>
     </form>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m14 5 5 5M4 20l4.5-1 10.2-10.2a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" />
+    </svg>
   );
 }

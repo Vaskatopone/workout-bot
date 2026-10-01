@@ -34,6 +34,17 @@ function writeLocal(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function mapPreset(preset) {
+  return {
+    id: `custom-${preset.id}`,
+    dbId: preset.id,
+    name: preset.name,
+    description: preset.description || "Мой сплит",
+    exercises: preset.exercises.map((item) => item.name),
+    custom: true,
+  };
+}
+
 export function todayISO() {
   const now = new Date();
   const month = String(now.getMonth() + 1).padStart(2, "0");
@@ -44,14 +55,7 @@ export function todayISO() {
 export async function loadCustomPresets() {
   try {
     const data = await request("/api/presets");
-    return data.map((preset) => ({
-      id: `custom-${preset.id}`,
-      dbId: preset.id,
-      name: preset.name,
-      description: preset.description || "Мой сплит",
-      exercises: preset.exercises.map((item) => item.name),
-      custom: true,
-    }));
+    return data.map(mapPreset);
   } catch {
     return readLocal(LS_PRESETS, []);
   }
@@ -82,6 +86,37 @@ export async function createCustomPreset({ name, description, exercises }) {
     writeLocal(LS_PRESETS, [...readLocal(LS_PRESETS, []), local]);
     return local;
   }
+}
+
+export async function updateCustomPreset(preset, { name, description, exercises }) {
+  if (preset.dbId) {
+    const saved = await request(`/api/presets/${preset.dbId}`, {
+      method: "PUT",
+      body: JSON.stringify({ name, description, exercises }),
+    });
+    const updated = mapPreset(saved);
+    const local = readLocal(LS_PRESETS, []);
+    writeLocal(LS_PRESETS, [
+      ...local.filter((item) => item.id !== preset.id && item.dbId !== preset.dbId),
+      updated,
+    ]);
+    return updated;
+  }
+
+  const updated = { ...preset, name, description, exercises };
+  const local = readLocal(LS_PRESETS, []);
+  writeLocal(LS_PRESETS, local.map((item) => (item.id === preset.id ? updated : item)));
+  return updated;
+}
+
+export async function deleteCustomPreset(preset) {
+  if (preset.dbId) {
+    await request(`/api/presets/${preset.dbId}`, { method: "DELETE" });
+  }
+  writeLocal(
+    LS_PRESETS,
+    readLocal(LS_PRESETS, []).filter((item) => item.id !== preset.id && item.dbId !== preset.dbId),
+  );
 }
 
 export async function loadHistory() {

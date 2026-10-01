@@ -50,6 +50,30 @@ class WorkoutPreset(Base):
     )
 
 
+class HiddenPreset(Base):
+    __tablename__ = "hidden_presets"
+
+    preset_id: Mapped[int] = mapped_column(
+        ForeignKey("workout_presets.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+
+
+class HiddenPresetExercise(Base):
+    __tablename__ = "hidden_preset_exercises"
+    __table_args__ = (UniqueConstraint("preset_id", "exercise_id", name="uq_hidden_preset_exercise"),)
+
+    preset_id: Mapped[int] = mapped_column(
+        ForeignKey("workout_presets.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    exercise_id: Mapped[int] = mapped_column(
+        ForeignKey("exercises.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+
 class Exercise(Base):
     __tablename__ = "exercises"
 

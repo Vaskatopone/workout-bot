@@ -4,7 +4,16 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from bot.database.models import Exercise, User, UserProfile, WeightEntry, WorkoutLog, WorkoutPreset
+from bot.database.models import (
+    Exercise,
+    HiddenPreset,
+    HiddenPresetExercise,
+    User,
+    UserProfile,
+    WeightEntry,
+    WorkoutLog,
+    WorkoutPreset,
+)
 
 
 async def get_or_create_user(
@@ -39,11 +48,28 @@ async def get_or_create_user(
 async def list_presets(session: AsyncSession, user_id: int) -> list[WorkoutPreset]:
     result = await session.execute(
         select(WorkoutPreset)
-        .where(WorkoutPreset.user_id == user_id)
+        .where(
+            WorkoutPreset.user_id == user_id,
+            WorkoutPreset.id.not_in(
+                select(HiddenPreset.preset_id).where(HiddenPreset.user_id == user_id)
+            ),
+        )
         .options(selectinload(WorkoutPreset.exercises))
         .order_by(WorkoutPreset.created_at.desc())
     )
     return list(result.scalars().unique().all())
+
+
+async def list_visible_preset_exercises(session: AsyncSession, preset_id: int) -> list[Exercise]:
+    hidden_exercises = select(HiddenPresetExercise.exercise_id).where(
+        HiddenPresetExercise.preset_id == preset_id
+    )
+    result = await session.execute(
+        select(Exercise)
+        .where(Exercise.preset_id == preset_id, Exercise.id.not_in(hidden_exercises))
+        .order_by(Exercise.position)
+    )
+    return list(result.scalars().all())
 
 
 async def create_preset(
@@ -65,6 +91,89 @@ async def create_preset(
     return preset
 
 
+async def update_preset(
+    session: AsyncSession,
+    user_id: int,
+    preset_id: int,
+    name: str,
+    description: str | None,
+    exercise_names: list[str],
+) -> WorkoutPreset | None:
+    result = await session.execute(
+        select(WorkoutPreset)
+        .where(WorkoutPreset.id == preset_id, WorkoutPreset.user_id == user_id)
+        .options(selectinload(WorkoutPreset.exercises))
+    )
+    preset = result.scalar_one_or_none()
+    if preset is None:
+        return None
+
+    desired_names = list(dict.fromkeys(item.strip() for item in exercise_names if item.strip()))
+    if not desired_names:
+        return None
+
+    hidden_preset_result = await session.execute(
+        select(HiddenPreset).where(HiddenPreset.preset_id == preset_id, HiddenPreset.user_id == user_id)
+    )
+    hidden_preset = hidden_preset_result.scalar_one_or_none()
+    if hidden_preset is not None:
+        await session.delete(hidden_preset)
+
+    hidden_result = await session.execute(
+        select(HiddenPresetExercise).where(HiddenPresetExercise.preset_id == preset_id)
+    )
+    hidden_by_id = {item.exercise_id: item for item in hidden_result.scalars().all()}
+    existing_by_name = {exercise.name: exercise for exercise in preset.exercises}
+    removed_exercises = [
+        exercise
+        for exercise in preset.exercises
+        if exercise.name not in desired_names and exercise.id not in hidden_by_id
+    ]
+    logged_ids: set[int] = set()
+    if removed_exercises:
+        log_result = await session.execute(
+            select(WorkoutLog.exercise_id)
+            .where(WorkoutLog.exercise_id.in_([exercise.id for exercise in removed_exercises]))
+            .distinct()
+        )
+        logged_ids = set(log_result.scalars().all())
+
+    for exercise in removed_exercises:
+        if exercise.id in logged_ids:
+            session.add(HiddenPresetExercise(preset_id=preset_id, exercise_id=exercise.id))
+        else:
+            await session.delete(exercise)
+
+    for position, exercise_name in enumerate(desired_names):
+        exercise = existing_by_name.get(exercise_name)
+        if exercise is None:
+            preset.exercises.append(Exercise(name=exercise_name, position=position))
+            continue
+        exercise.position = position
+        hidden_exercise = hidden_by_id.get(exercise.id)
+        if hidden_exercise is not None:
+            await session.delete(hidden_exercise)
+
+    preset.name = name.strip()
+    preset.description = description
+    await session.commit()
+    return preset
+
+
+async def hide_preset(session: AsyncSession, user_id: int, preset_id: int) -> bool:
+    result = await session.execute(
+        select(WorkoutPreset.id).where(WorkoutPreset.id == preset_id, WorkoutPreset.user_id == user_id)
+    )
+    if result.scalar_one_or_none() is None:
+        return False
+
+    hidden_result = await session.execute(select(HiddenPreset).where(HiddenPreset.preset_id == preset_id))
+    if hidden_result.scalar_one_or_none() is None:
+        session.add(HiddenPreset(preset_id=preset_id, user_id=user_id))
+        await session.commit()
+    return True
+
+
 async def get_or_create_preset_with_exercises(
     session: AsyncSession,
     user_id: int,
@@ -80,14 +189,31 @@ async def get_or_create_preset_with_exercises(
     if preset is None:
         return await create_preset(session, user_id, name, None, exercise_names)
 
-    existing = {exercise.name for exercise in preset.exercises}
+    hidden_preset_result = await session.execute(
+        select(HiddenPreset).where(HiddenPreset.preset_id == preset.id, HiddenPreset.user_id == user_id)
+    )
+    hidden_preset = hidden_preset_result.scalar_one_or_none()
+    if hidden_preset is not None:
+        await session.delete(hidden_preset)
+
+    hidden_result = await session.execute(
+        select(HiddenPresetExercise).where(HiddenPresetExercise.preset_id == preset.id)
+    )
+    hidden_by_id = {item.exercise_id: item for item in hidden_result.scalars().all()}
+
+    existing = {exercise.name: exercise for exercise in preset.exercises}
     next_position = len(preset.exercises)
     for exercise_name in exercise_names:
         clean = exercise_name.strip()
         if clean and clean not in existing:
-            preset.exercises.append(Exercise(name=clean, position=next_position))
+            exercise = Exercise(name=clean, position=next_position)
+            preset.exercises.append(exercise)
             next_position += 1
-            existing.add(clean)
+            existing[clean] = exercise
+        elif clean in existing:
+            hidden_exercise = hidden_by_id.get(existing[clean].id)
+            if hidden_exercise is not None:
+                await session.delete(hidden_exercise)
     await session.commit()
     await session.refresh(preset, attribute_names=["exercises"])
     return preset

@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from datetime import date
 
-from fastapi import Depends, FastAPI, Response
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -12,16 +12,20 @@ from bot.database.crud import (
     delete_workout_day,
     get_user_profile,
     get_or_create_user,
+    hide_preset,
     list_history,
     list_presets,
+    list_visible_preset_exercises,
     save_weight_entry,
     save_workout,
     update_user_profile,
+    update_preset,
 )
 from bot.schemas import (
     HistoryDayOut,
     PresetCreate,
     PresetOut,
+    PresetUpdate,
     ProfileOut,
     ProfileUpdate,
     SetOut,
@@ -85,7 +89,7 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
                 description=preset.description,
                 exercises=[
                     {"id": exercise.id, "name": exercise.name, "position": exercise.position}
-                    for exercise in sorted(preset.exercises, key=lambda item: item.position)
+                    for exercise in await list_visible_preset_exercises(session, preset.id)
                 ],
             )
             for preset in presets
@@ -107,9 +111,40 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
             description=preset.description,
             exercises=[
                 {"id": exercise.id, "name": exercise.name, "position": exercise.position}
-                for exercise in sorted(preset.exercises, key=lambda item: item.position)
+                for exercise in await list_visible_preset_exercises(session, preset.id)
             ],
         )
+
+    @app.put("/api/presets/{preset_id}", response_model=PresetOut)
+    async def put_preset(preset_id: int, payload: PresetUpdate, ctx=Depends(db_user)) -> PresetOut:
+        session, user = ctx
+        preset = await update_preset(
+            session,
+            user.id,
+            preset_id,
+            payload.name,
+            payload.description,
+            payload.exercises,
+        )
+        if preset is None:
+            raise HTTPException(status_code=404, detail="Preset not found")
+        exercises = await list_visible_preset_exercises(session, preset.id)
+        return PresetOut(
+            id=preset.id,
+            name=preset.name,
+            description=preset.description,
+            exercises=[
+                {"id": exercise.id, "name": exercise.name, "position": exercise.position}
+                for exercise in exercises
+            ],
+        )
+
+    @app.delete("/api/presets/{preset_id}", status_code=204)
+    async def delete_preset(preset_id: int, ctx=Depends(db_user)) -> Response:
+        session, user = ctx
+        if not await hide_preset(session, user.id, preset_id):
+            raise HTTPException(status_code=404, detail="Preset not found")
+        return Response(status_code=204)
 
     @app.get("/api/history", response_model=list[HistoryDayOut])
     async def get_history(ctx=Depends(db_user)) -> list[HistoryDayOut]:

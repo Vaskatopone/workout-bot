@@ -8,6 +8,7 @@ import ProfileScreen from "./screens/ProfileScreen.jsx";
 import {
   createCustomPreset,
   deleteWorkoutDay,
+  deleteCustomPreset,
   loadCustomPresets,
   loadHistory,
   loadProfile,
@@ -15,6 +16,7 @@ import {
   saveWeightEntry,
   saveWorkout,
   todayISO,
+  updateCustomPreset,
 } from "./storage.js";
 import { confirmAction, notify } from "./telegram.js";
 
@@ -73,6 +75,36 @@ export default function App() {
             const preset = await createCustomPreset(payload);
             setCustom((current) => [preset, ...current]);
             showToast("Сплит сохранён");
+          }}
+          onUpdate={async (preset, payload) => {
+            try {
+              const updated = await updateCustomPreset(preset, payload);
+              setCustom((current) => current.map((item) => (item.id === preset.id ? updated : item)));
+              showToast("Сплит обновлён");
+              return true;
+            } catch {
+              notify("error");
+              showToast("Не удалось сохранить изменения");
+              return false;
+            }
+          }}
+          onDelete={async (preset) => {
+            if (selectedId === preset.id) {
+              showToast("Сначала заверши активную тренировку");
+              return false;
+            }
+            const confirmed = await confirmAction(`Удалить сплит «${preset.name}»? История тренировок сохранится.`);
+            if (!confirmed) return false;
+            try {
+              await deleteCustomPreset(preset);
+              setCustom((current) => current.filter((item) => item.id !== preset.id));
+              showToast("Сплит удалён");
+              return true;
+            } catch {
+              notify("error");
+              showToast("Не удалось удалить сплит");
+              return false;
+            }
           }}
         />
       ),
