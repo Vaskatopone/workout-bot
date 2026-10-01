@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { EXERCISE_CATEGORIES } from "../presets.js";
 import { haptic } from "../telegram.js";
 
 export default function PresetsScreen({ builtin, custom, selectedId, onSelect, onCreate }) {
@@ -90,18 +91,23 @@ function PresetCard({ preset, selected, onSelect }) {
 function CreateSplitForm({ onCancel, onCreate }) {
   const [name, setName] = useState("");
   const [exercise, setExercise] = useState("");
+  const [categoryId, setCategoryId] = useState(EXERCISE_CATEGORIES[0].id);
   const [exercises, setExercises] = useState([]);
   const [error, setError] = useState("");
+  const category = EXERCISE_CATEGORIES.find((item) => item.id === categoryId);
 
-  const addExercise = () => {
-    const clean = exercise.trim();
+  const addExercise = (item) => {
+    const clean = (typeof item === "string" ? item : item.name).trim();
     if (!clean) return;
-    if (exercises.includes(clean)) {
+    if (exercises.some((selected) => selected.name === clean)) {
       setError("Такое упражнение уже есть");
       return;
     }
-    setExercises((current) => [...current, clean]);
-    setExercise("");
+    setExercises((current) => [
+      ...current,
+      { name: clean, image: typeof item === "string" ? null : item.image },
+    ]);
+    if (typeof item === "string") setExercise("");
     setError("");
     haptic("light");
   };
@@ -115,7 +121,7 @@ function CreateSplitForm({ onCancel, onCreate }) {
           setError("Нужны название и хотя бы одно упражнение");
           return;
         }
-        await onCreate({ name: name.trim(), exercises });
+        await onCreate({ name: name.trim(), exercises: exercises.map((item) => item.name) });
         onCancel();
       }}
     >
@@ -126,43 +132,106 @@ function CreateSplitForm({ onCancel, onCreate }) {
         placeholder="Название, например «Грудь/трицепс»"
         className="w-full rounded-xl bg-black/30 px-3 py-3 outline-none placeholder:text-tg-hint"
       />
-      <div className="flex gap-2">
-        <input
-          value={exercise}
-          onChange={(event) => setExercise(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.preventDefault();
-              addExercise();
-            }
-          }}
-          placeholder="Упражнение"
-          className="min-w-0 flex-1 rounded-xl bg-black/30 px-3 py-3 outline-none placeholder:text-tg-hint"
-        />
-        <button
-          type="button"
-          onClick={addExercise}
-          className="rounded-xl bg-tg-button px-3 font-semibold text-tg-buttonText"
+      <label className="block space-y-1.5">
+        <span className="text-xs font-medium text-tg-hint">Группа мышц</span>
+        <select
+          value={categoryId}
+          onChange={(event) => setCategoryId(event.target.value)}
+          className="w-full rounded-xl bg-black/30 px-3 py-3 text-tg-text outline-none"
         >
-          Добавить
-        </button>
+          {EXERCISE_CATEGORIES.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="grid grid-cols-2 gap-2">
+        {category.exercises.map((item) => {
+          const added = exercises.some((selected) => selected.name === item.name);
+          return (
+            <article key={item.name} className="overflow-hidden rounded-lg bg-tg-section">
+              <div className="relative aspect-[4/3] bg-black/25">
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                  onError={(event) => event.currentTarget.remove()}
+                />
+              </div>
+              <div className="space-y-2 p-2.5">
+                <div className="min-h-10 text-sm font-medium leading-snug">{item.name}</div>
+                <button
+                  type="button"
+                  disabled={added}
+                  onClick={() => addExercise(item)}
+                  className="w-full rounded-lg bg-tg-button px-2 py-2 text-xs font-semibold text-tg-buttonText disabled:bg-black/30 disabled:text-tg-hint"
+                >
+                  {added ? "Добавлено" : "+ Добавить"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
+
+      <details className="text-sm">
+        <summary className="cursor-pointer text-tg-link">Добавить своё упражнение</summary>
+        <div className="mt-2 flex gap-2">
+          <input
+            value={exercise}
+            onChange={(event) => setExercise(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addExercise(exercise);
+              }
+            }}
+            placeholder="Название упражнения"
+            className="min-w-0 flex-1 rounded-xl bg-black/30 px-3 py-3 outline-none placeholder:text-tg-hint"
+          />
+          <button
+            type="button"
+            onClick={() => addExercise(exercise)}
+            className="rounded-xl bg-tg-button px-3 font-semibold text-tg-buttonText"
+          >
+            Добавить
+          </button>
+        </div>
+      </details>
+
       <div className="space-y-2">
+        <div className="text-xs font-semibold uppercase tracking-wide text-tg-hint">
+          В сплите: {exercises.length}
+        </div>
         {exercises.map((item, index) => (
-          <div key={item} className="flex items-center justify-between rounded-xl bg-black/20 px-3 py-2">
-            <span className="text-sm">
-              {index + 1}. {item}
+          <div key={item.name} className="flex items-center gap-3 border-b border-white/5 py-2">
+            {item.image ? (
+              <img
+                src={item.image}
+                alt=""
+                className="h-12 w-12 rounded-lg bg-black/25 object-cover"
+                onError={(event) => event.currentTarget.remove()}
+              />
+            ) : null}
+            <span className="min-w-0 flex-1 text-sm">
+              {index + 1}. {item.name}
             </span>
             <button
               type="button"
               className="text-sm text-tg-hint"
-              onClick={() => setExercises((current) => current.filter((name) => name !== item))}
+              onClick={() => setExercises((current) => current.filter((selected) => selected.name !== item.name))}
             >
               Удалить
             </button>
           </div>
         ))}
       </div>
+      <p className="text-[11px] text-tg-hint">
+        Иллюстрации предоставлены <a href="https://wger.de" target="_blank" rel="noreferrer" className="text-tg-link">wger.de</a>.
+      </p>
       {error ? <p className="text-sm text-tg-destructive">{error}</p> : null}
       <div className="flex gap-2">
         <button type="button" onClick={onCancel} className="flex-1 rounded-xl bg-black/30 py-3 text-tg-hint">
