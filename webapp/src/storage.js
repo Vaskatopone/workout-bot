@@ -1,5 +1,6 @@
 const LS_PRESETS = "workout.customPresets";
 const LS_HISTORY = "workout.history";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 function headers() {
   const initData = window.Telegram?.WebApp?.initData;
@@ -10,7 +11,10 @@ function headers() {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(path, { ...options, headers: { ...headers(), ...options.headers } });
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: { ...headers(), ...options.headers },
+  });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   if (response.status === 204) return null;
   return response.json();

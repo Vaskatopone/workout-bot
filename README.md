@@ -35,3 +35,7 @@ cd webapp && npm run build
 ## Render
 
 Для деплоя через Blueprint используй `render.yaml`. Укажи `BOT_TOKEN` и `WEBAPP_URL` в переменных окружения Render. Если сервис уже создан вручную, установи Build Command из `render.yaml` и Start Command `python -m bot.main`; команда `npm` сама по себе не запускает приложение.
+
+## GitHub Pages
+
+Workflow публикует `webapp/dist` на GitHub Pages при push в `main`. В Settings → Pages выбери источник GitHub Actions. Добавь переменную репозитория `VITE_API_BASE_URL` с базовым HTTPS-адресом backend на Render, чтобы WebApp отправлял API-запросы на backend.
