@@ -20,8 +20,22 @@ import {
 } from "./storage.js";
 import { confirmAction, notify } from "./telegram.js";
 
-function emptyDraft(preset) {
-  return (preset?.exercises ?? []).map((name) => ({ name, weight: "", reps: "", sets: [] }));
+function emptyDraft(preset, history, workoutDate) {
+  return (preset?.exercises ?? []).map((name) => {
+    const previousDay = [...history]
+      .filter((day) => day.date <= workoutDate)
+      .sort((left, right) => right.date.localeCompare(left.date))
+      .find((day) => day.sets.some((set) => set.exercise === name));
+    const previousSets = previousDay?.sets.filter((set) => set.exercise === name) ?? [];
+    const previousWeight = previousSets[previousSets.length - 1]?.weight;
+    return {
+      name,
+      weight: previousWeight == null ? "" : String(previousWeight),
+      previousWeight: previousWeight ?? null,
+      reps: "",
+      sets: [],
+    };
+  });
 }
 
 export default function App() {
@@ -77,9 +91,10 @@ export default function App() {
           custom={custom}
           selectedId={selectedId}
           onSelect={(preset) => {
+            const workoutDate = todayISO();
             setSelected(preset);
-            setDraft(emptyDraft(preset));
-            setDate(todayISO());
+            setDraft(emptyDraft(preset, history, workoutDate));
+            setDate(workoutDate);
             setStartedAt(Date.now());
             setElapsedSeconds(0);
             setTab("workout");

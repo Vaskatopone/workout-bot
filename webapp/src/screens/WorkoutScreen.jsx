@@ -39,6 +39,9 @@ export default function WorkoutScreen({ preset, onStart, elapsedSeconds, date, o
       {draft.map((exercise, index) => (
         <article key={exercise.name} className="rounded-2xl bg-tg-section p-4 shadow-card">
           <div className="text-[17px] font-semibold">{exercise.name}</div>
+          {exercise.previousWeight != null ? (
+            <p className="mt-1 text-xs text-tg-hint">Последний раз: {exercise.previousWeight} кг</p>
+          ) : null}
           {exercise.sets.length > 0 ? (
             <div className="mt-3 space-y-1.5">
               {exercise.sets.map((set, setIndex) => (
