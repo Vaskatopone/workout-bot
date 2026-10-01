@@ -10,7 +10,7 @@ function formatDate(value) {
   });
 }
 
-export default function HistoryScreen({ history }) {
+export default function HistoryScreen({ history, onDelete }) {
   const [openDate, setOpenDate] = useState(history[0]?.date ?? null);
 
   useEffect(() => {
@@ -54,22 +54,33 @@ export default function HistoryScreen({ history }) {
         const open = openDate === day.date;
         return (
           <section key={day.date} className="overflow-hidden rounded-2xl bg-tg-section shadow-card">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-4 py-4 text-left"
-              onClick={() => {
-                haptic("light");
-                setOpenDate(open ? null : day.date);
-              }}
-            >
-              <div>
-                <div className="text-[17px] font-semibold capitalize">{formatDate(day.date)}</div>
-                <div className="mt-0.5 text-sm text-tg-hint">
-                  {day.preset_name} · {day.sets.length} подходов
+            <div className="flex items-center">
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center justify-between px-4 py-4 text-left"
+                onClick={() => {
+                  haptic("light");
+                  setOpenDate(open ? null : day.date);
+                }}
+              >
+                <div>
+                  <div className="text-[17px] font-semibold capitalize">{formatDate(day.date)}</div>
+                  <div className="mt-0.5 text-sm text-tg-hint">
+                    {day.preset_name} · {day.sets.length} подходов
+                  </div>
                 </div>
-              </div>
-              <span className="text-tg-hint">{open ? "▾" : "›"}</span>
-            </button>
+                <span className="ml-2 text-tg-hint">{open ? "▾" : "›"}</span>
+              </button>
+              <button
+                type="button"
+                aria-label={`Удалить тренировку за ${formatDate(day.date)}`}
+                title="Удалить тренировку"
+                onClick={() => onDelete(day.date)}
+                className="mr-3 grid h-10 w-10 shrink-0 place-items-center rounded-lg text-tg-hint hover:bg-black/20 hover:text-tg-destructive"
+              >
+                <TrashIcon />
+              </button>
+            </div>
             {open ? (
               <div className="space-y-2 border-t border-white/5 px-4 pb-4 pt-2">
                 {groupSets(day.sets).map((exercise) => (
@@ -91,6 +102,14 @@ export default function HistoryScreen({ history }) {
         );
       })}
     </div>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" />
+    </svg>
   );
 }
 

@@ -50,3 +50,11 @@ export function haptic(type = "light") {
 export function notify(type = "success") {
   getTelegram()?.HapticFeedback?.notificationOccurred(type);
 }
+
+export function confirmAction(message) {
+  const tg = getTelegram();
+  if (tg?.showConfirm) {
+    return new Promise((resolve) => tg.showConfirm(message, resolve));
+  }
+  return Promise.resolve(window.confirm(message));
+}

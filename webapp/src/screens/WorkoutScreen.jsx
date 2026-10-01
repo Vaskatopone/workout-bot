@@ -1,11 +1,18 @@
 import { haptic, notify } from "../telegram.js";
 
-export default function WorkoutScreen({ preset, date, onDateChange, draft, onChangeDraft, onFinish }) {
+export default function WorkoutScreen({ preset, onStart, date, onDateChange, draft, onChangeDraft, onFinish }) {
   if (!preset) {
     return (
       <div className="pt-10 text-center">
         <h1 className="text-[28px] font-semibold">Тренировка</h1>
-        <p className="mt-2 text-sm text-tg-hint">Сначала выбери сплит на первой вкладке — форма подходов удобнее, чем кнопки в боте.</p>
+        <p className="mt-2 text-sm text-tg-hint">Активной тренировки нет.</p>
+        <button
+          type="button"
+          onClick={onStart}
+          className="mt-5 w-full rounded-2xl bg-tg-button py-4 text-[16px] font-semibold text-tg-buttonText"
+        >
+          Начать тренировку
+        </button>
       </div>
     );
   }

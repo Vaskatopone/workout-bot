@@ -1,12 +1,15 @@
 from collections import defaultdict
 
-from fastapi import Depends, FastAPI
+from datetime import date
+
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bot.database.crud import (
     create_preset,
+    delete_workout_day,
     get_user_profile,
     get_or_create_user,
     list_history,
@@ -127,6 +130,12 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
             HistoryDayOut(date=day, preset_name=names[day], sets=sets)
             for day, sets in grouped.items()
         ]
+
+    @app.delete("/api/history/{logged_on}", status_code=204)
+    async def delete_history_day(logged_on: date, ctx=Depends(db_user)) -> Response:
+        session, user = ctx
+        await delete_workout_day(session, user.id, logged_on)
+        return Response(status_code=204)
 
     @app.post("/api/workouts")
     async def post_workout(payload: WorkoutCreate, ctx=Depends(db_user)) -> dict:

@@ -7,6 +7,7 @@ import HistoryScreen from "./screens/HistoryScreen.jsx";
 import ProfileScreen from "./screens/ProfileScreen.jsx";
 import {
   createCustomPreset,
+  deleteWorkoutDay,
   loadCustomPresets,
   loadHistory,
   loadProfile,
@@ -15,7 +16,7 @@ import {
   saveWorkout,
   todayISO,
 } from "./storage.js";
-import { notify } from "./telegram.js";
+import { confirmAction, notify } from "./telegram.js";
 
 function emptyDraft(preset) {
   return (preset?.exercises ?? []).map((name) => ({ name, weight: "", reps: "", sets: [] }));
@@ -78,6 +79,7 @@ export default function App() {
       workout: (
         <WorkoutScreen
           preset={selected}
+          onStart={() => setTab("presets")}
           date={date}
           onDateChange={setDate}
           draft={draft}
@@ -98,14 +100,27 @@ export default function App() {
             await saveWorkout({ logged_on: date, preset_name: selected.name, sets });
             const days = await loadHistory();
             setHistory(days);
-            setDraft(emptyDraft(selected));
+            setSelected(null);
+            setDraft([]);
+            setDate(todayISO());
             notify("success");
             showToast("Тренировка сохранена");
             setTab("history");
           }}
         />
       ),
-      history: <HistoryScreen history={history} />,
+      history: (
+        <HistoryScreen
+          history={history}
+          onDelete={async (loggedOn) => {
+            const confirmed = await confirmAction("Удалить тренировку и все её подходы? Отменить это действие нельзя.");
+            if (!confirmed) return;
+            setHistory(await deleteWorkoutDay(loggedOn, history));
+            notify("success");
+            showToast("Тренировка удалена");
+          }}
+        />
+      ),
       profile: (
         <ProfileScreen
           profile={profile}

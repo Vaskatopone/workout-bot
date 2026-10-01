@@ -1,6 +1,6 @@
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -126,6 +126,16 @@ async def list_history(session: AsyncSession, user_id: int) -> list[WorkoutLog]:
         .order_by(WorkoutLog.logged_on.desc(), WorkoutLog.created_at.asc())
     )
     return list(result.scalars().unique().all())
+
+
+async def delete_workout_day(session: AsyncSession, user_id: int, logged_on: date) -> None:
+    await session.execute(
+        delete(WorkoutLog).where(
+            WorkoutLog.user_id == user_id,
+            WorkoutLog.logged_on == logged_on,
+        )
+    )
+    await session.commit()
 
 
 async def get_user_profile(session: AsyncSession, user_id: int) -> dict:

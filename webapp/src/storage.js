@@ -92,6 +92,17 @@ export async function loadHistory() {
   }
 }
 
+export async function deleteWorkoutDay(logged_on, currentHistory) {
+  try {
+    await request(`/api/history/${logged_on}`, { method: "DELETE" });
+    return await loadHistory();
+  } catch {
+    const history = currentHistory.filter((day) => day.date !== logged_on);
+    writeLocal(LS_HISTORY, history);
+    return history;
+  }
+}
+
 export async function saveWorkout({ logged_on, preset_name, sets }) {
   const entry = { date: logged_on, preset_name, sets };
   try {
