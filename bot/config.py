@@ -1,0 +1,30 @@
+import os
+from dataclasses import dataclass
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+@dataclass(frozen=True, slots=True)
+class Settings:
+    bot_token: str
+    webapp_url: str
+    database_url: str
+
+
+def get_settings() -> Settings:
+    bot_token = os.getenv("BOT_TOKEN", "").strip()
+    webapp_url = os.getenv("WEBAPP_URL", "").strip()
+    database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./workout.db").strip()
+
+    if not bot_token:
+        raise RuntimeError("BOT_TOKEN is not set")
+    if not webapp_url:
+        raise RuntimeError("WEBAPP_URL is not set")
+
+    return Settings(
+        bot_token=bot_token,
+        webapp_url=webapp_url,
+        database_url=database_url,
+    )
