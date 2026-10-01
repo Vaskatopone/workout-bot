@@ -113,6 +113,16 @@ class WorkoutLog(Base):
     exercise: Mapped[Exercise] = relationship(back_populates="logs")
 
 
+class WorkoutDuration(Base):
+    __tablename__ = "workout_durations"
+    __table_args__ = (UniqueConstraint("user_id", "logged_on", name="uq_workout_duration_user_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    logged_on: Mapped[date] = mapped_column(Date)
+    duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
+
+
 class UserProfile(Base):
     __tablename__ = "user_profiles"
 

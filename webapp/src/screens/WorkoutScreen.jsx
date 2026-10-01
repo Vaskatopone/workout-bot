@@ -1,6 +1,6 @@
 import { haptic, notify } from "../telegram.js";
 
-export default function WorkoutScreen({ preset, onStart, date, onDateChange, draft, onChangeDraft, onFinish }) {
+export default function WorkoutScreen({ preset, onStart, elapsedSeconds, date, onDateChange, draft, onChangeDraft, onFinish }) {
   if (!preset) {
     return (
       <div className="pt-10 text-center">
@@ -24,7 +24,9 @@ export default function WorkoutScreen({ preset, onStart, date, onDateChange, dra
       <header className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight">{preset.name}</h1>
-          <p className="mt-1 text-sm text-tg-hint">{totalSets} подходов записано</p>
+          <p className="mt-1 text-sm text-tg-hint">
+            {totalSets} подходов · <span className="tabular-nums">{formatDuration(elapsedSeconds)}</span>
+          </p>
         </div>
         <input
           type="date"
@@ -43,7 +45,7 @@ export default function WorkoutScreen({ preset, onStart, date, onDateChange, dra
                 <button
                   key={`${set.weight}-${set.repetitions}-${setIndex}`}
                   type="button"
-                  className="flex w-full items-center justify-between rounded-xl bg-black/25 px-3 py-2 text-sm"
+                  className="flex w-full items-center justify-between rounded-xl bg-tg-bg px-3 py-2 text-sm"
                   onClick={() => {
                     haptic("light");
                     onChangeDraft(
@@ -80,7 +82,7 @@ export default function WorkoutScreen({ preset, onStart, date, onDateChange, dra
                   )
                 }
                 placeholder="60"
-                className="w-full rounded-xl bg-black/30 px-3 py-3 outline-none"
+                className="w-full rounded-xl bg-tg-bg px-3 py-3 outline-none"
               />
             </label>
             <label className="block">
@@ -96,7 +98,7 @@ export default function WorkoutScreen({ preset, onStart, date, onDateChange, dra
                   )
                 }
                 placeholder="8"
-                className="w-full rounded-xl bg-black/30 px-3 py-3 outline-none"
+                className="w-full rounded-xl bg-tg-bg px-3 py-3 outline-none"
               />
             </label>
             <button
@@ -134,4 +136,11 @@ export default function WorkoutScreen({ preset, onStart, date, onDateChange, dra
       </button>
     </div>
   );
+}
+
+function formatDuration(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
 }

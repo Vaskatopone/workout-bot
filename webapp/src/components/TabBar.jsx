@@ -7,7 +7,7 @@ export default function TabBar({ tab, onChange }) {
   ];
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/5 bg-tg-secondary/95 backdrop-blur-md">
+    <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-tg-divider bg-tg-secondary/95 backdrop-blur-md">
       <div className="mx-auto grid max-w-lg grid-cols-4 px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2">
         {items.map((item) => {
           const active = tab === item.id;

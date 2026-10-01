@@ -32,6 +32,8 @@ export default function App() {
   const [selected, setSelected] = useState(null);
   const [date, setDate] = useState(todayISO());
   const [draft, setDraft] = useState([]);
+  const [startedAt, setStartedAt] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -52,6 +54,14 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (startedAt === null) return undefined;
+    const updateElapsed = () => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    updateElapsed();
+    const timerId = window.setInterval(updateElapsed, 1000);
+    return () => window.clearInterval(timerId);
+  }, [startedAt]);
+
   const selectedId = selected?.id ?? null;
 
   function showToast(message) {
@@ -69,6 +79,9 @@ export default function App() {
           onSelect={(preset) => {
             setSelected(preset);
             setDraft(emptyDraft(preset));
+            setDate(todayISO());
+            setStartedAt(Date.now());
+            setElapsedSeconds(0);
             setTab("workout");
           }}
           onCreate={async (payload) => {
@@ -112,6 +125,7 @@ export default function App() {
         <WorkoutScreen
           preset={selected}
           onStart={() => setTab("presets")}
+          elapsedSeconds={elapsedSeconds}
           date={date}
           onDateChange={setDate}
           draft={draft}
@@ -129,12 +143,20 @@ export default function App() {
               showToast("Добавь хотя бы один подход");
               return;
             }
-            await saveWorkout({ logged_on: date, preset_name: selected.name, sets });
+            const durationSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+            await saveWorkout({
+              logged_on: date,
+              preset_name: selected.name,
+              sets,
+              duration_seconds: durationSeconds,
+            });
             const days = await loadHistory();
             setHistory(days);
             setSelected(null);
             setDraft([]);
             setDate(todayISO());
+            setStartedAt(null);
+            setElapsedSeconds(0);
             notify("success");
             showToast("Тренировка сохранена");
             setTab("history");
@@ -171,7 +193,7 @@ export default function App() {
         />
       ),
     }),
-    [custom, date, draft, history, profile, selected, selectedId],
+    [custom, date, draft, elapsedSeconds, history, profile, selected, selectedId, startedAt],
   );
 
   return (
@@ -181,7 +203,7 @@ export default function App() {
       </main>
       <TabBar tab={tab} onChange={setTab} />
       {toast ? (
-        <div className="fixed inset-x-0 bottom-24 z-30 mx-auto w-fit rounded-full bg-black/80 px-4 py-2 text-sm">
+        <div className="fixed inset-x-0 bottom-24 z-30 mx-auto w-fit rounded-full bg-black/80 px-4 py-2 text-sm text-white">
           {toast}
         </div>
       ) : null}

@@ -3,16 +3,32 @@
 @tailwind utilities;
 
 :root {
-  --tg-bg: #17212b;
-  --tg-secondary-bg: #0e1621;
-  --tg-section-bg: #232e3c;
-  --tg-text: #ffffff;
-  --tg-hint: #708499;
-  --tg-link: #6ab3f3;
-  --tg-button: #5288c1;
+  --tg-bg: #ffffff;
+  --tg-secondary-bg: #f4f4f5;
+  --tg-section-bg: #f1f3f5;
+  --tg-text: #1c1c1e;
+  --tg-hint: #707579;
+  --tg-link: #2481cc;
+  --tg-button: #3390ec;
   --tg-button-text: #ffffff;
-  --tg-destructive: #e53935;
-  color-scheme: dark;
+  --tg-destructive: #d94b4b;
+  --tg-divider: #e2e5e9;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --tg-bg: #17212b;
+    --tg-secondary-bg: #0e1621;
+    --tg-section-bg: #232e3c;
+    --tg-text: #ffffff;
+    --tg-hint: #708499;
+    --tg-link: #6ab3f3;
+    --tg-button: #5288c1;
+    --tg-destructive: #e53935;
+    --tg-divider: rgba(255, 255, 255, 0.07);
+    color-scheme: dark;
+  }
 }
 
 html,
@@ -36,5 +52,10 @@ textarea {
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.8);
+  opacity: 0.75;
+}
+
+::selection {
+  background: var(--tg-button);
+  color: var(--tg-button-text);
 }

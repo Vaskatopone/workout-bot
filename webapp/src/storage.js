@@ -138,12 +138,12 @@ export async function deleteWorkoutDay(logged_on, currentHistory) {
   }
 }
 
-export async function saveWorkout({ logged_on, preset_name, sets }) {
-  const entry = { date: logged_on, preset_name, sets };
+export async function saveWorkout({ logged_on, preset_name, sets, duration_seconds = 0 }) {
+  const entry = { date: logged_on, preset_name, sets, duration_seconds };
   try {
     await request("/api/workouts", {
       method: "POST",
-      body: JSON.stringify({ logged_on, preset_name, sets }),
+      body: JSON.stringify({ logged_on, preset_name, sets, duration_seconds }),
     });
   } catch {
     const history = readLocal(LS_HISTORY, []);
@@ -151,6 +151,7 @@ export async function saveWorkout({ logged_on, preset_name, sets }) {
     if (existing) {
       existing.preset_name = preset_name;
       existing.sets = [...existing.sets, ...sets];
+      existing.duration_seconds = (existing.duration_seconds ?? 0) + duration_seconds;
     } else {
       history.unshift(entry);
     }

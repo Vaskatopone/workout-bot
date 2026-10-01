@@ -11,6 +11,7 @@ from bot.database.models import (
     User,
     UserProfile,
     WeightEntry,
+    WorkoutDuration,
     WorkoutLog,
     WorkoutPreset,
 )
@@ -225,6 +226,7 @@ async def save_workout(
     logged_on: date,
     preset_name: str,
     sets: list[dict],
+    duration_seconds: int = 0,
 ) -> None:
     exercise_names = [item["exercise"] for item in sets]
     preset = await get_or_create_preset_with_exercises(session, user_id, preset_name, exercise_names)
@@ -241,6 +243,23 @@ async def save_workout(
                 repetitions=item["repetitions"],
             )
         )
+    duration_result = await session.execute(
+        select(WorkoutDuration).where(
+            WorkoutDuration.user_id == user_id,
+            WorkoutDuration.logged_on == logged_on,
+        )
+    )
+    duration_entry = duration_result.scalar_one_or_none()
+    if duration_entry is None:
+        session.add(
+            WorkoutDuration(
+                user_id=user_id,
+                logged_on=logged_on,
+                duration_seconds=duration_seconds,
+            )
+        )
+    else:
+        duration_entry.duration_seconds += duration_seconds
     await session.commit()
 
 
@@ -254,11 +273,26 @@ async def list_history(session: AsyncSession, user_id: int) -> list[WorkoutLog]:
     return list(result.scalars().unique().all())
 
 
+async def list_workout_durations(session: AsyncSession, user_id: int) -> dict[date, int]:
+    result = await session.execute(
+        select(WorkoutDuration.logged_on, WorkoutDuration.duration_seconds).where(
+            WorkoutDuration.user_id == user_id
+        )
+    )
+    return {logged_on: duration_seconds for logged_on, duration_seconds in result.all()}
+
+
 async def delete_workout_day(session: AsyncSession, user_id: int, logged_on: date) -> None:
     await session.execute(
         delete(WorkoutLog).where(
             WorkoutLog.user_id == user_id,
             WorkoutLog.logged_on == logged_on,
+        )
+    )
+    await session.execute(
+        delete(WorkoutDuration).where(
+            WorkoutDuration.user_id == user_id,
+            WorkoutDuration.logged_on == logged_on,
         )
     )
     await session.commit()

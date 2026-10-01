@@ -38,6 +38,7 @@ class WorkoutCreate(BaseModel):
     logged_on: date
     preset_name: str = Field(min_length=1, max_length=128)
     sets: list[SetIn] = Field(min_length=1)
+    duration_seconds: int = Field(default=0, ge=0, le=86400)
 
 
 class SetOut(BaseModel):
@@ -50,6 +51,7 @@ class HistoryDayOut(BaseModel):
     date: date
     preset_name: str | None
     sets: list[SetOut]
+    duration_seconds: int | None = None
 
 
 class WeightEntryOut(BaseModel):

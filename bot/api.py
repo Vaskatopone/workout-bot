@@ -16,6 +16,7 @@ from bot.database.crud import (
     list_history,
     list_presets,
     list_visible_preset_exercises,
+    list_workout_durations,
     save_weight_entry,
     save_workout,
     update_user_profile,
@@ -150,6 +151,7 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
     async def get_history(ctx=Depends(db_user)) -> list[HistoryDayOut]:
         session, user = ctx
         logs = await list_history(session, user.id)
+        durations = await list_workout_durations(session, user.id)
         grouped: dict = defaultdict(list)
         names: dict = {}
         for log in logs:
@@ -162,7 +164,12 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
             )
             names[log.logged_on] = log.exercise.preset.name
         return [
-            HistoryDayOut(date=day, preset_name=names[day], sets=sets)
+            HistoryDayOut(
+                date=day,
+                preset_name=names[day],
+                sets=sets,
+                duration_seconds=durations.get(day),
+            )
             for day, sets in grouped.items()
         ]
 
@@ -181,6 +188,7 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
             payload.logged_on,
             payload.preset_name,
             [item.model_dump() for item in payload.sets],
+            payload.duration_seconds,
         )
         return {"ok": True}
 

@@ -120,7 +120,7 @@ export default function ProfileScreen({ profile, onSaveProfile, onAddWeight }) {
         </p>
       ) : null}
 
-      <form onSubmit={submitProfile} className="space-y-3 border-t border-white/5 pt-5">
+      <form onSubmit={submitProfile} className="space-y-3 border-t border-tg-divider pt-5">
         <h2 className="text-lg font-semibold">Целевой вес</h2>
         <div className="grid grid-cols-2 gap-3">
           <WeightInput label="Текущий, кг" value={currentWeight} onChange={setCurrentWeight} />
@@ -131,7 +131,7 @@ export default function ProfileScreen({ profile, onSaveProfile, onAddWeight }) {
         </button>
       </form>
 
-      <form onSubmit={submitWeight} className="space-y-3 border-t border-white/5 pt-5">
+      <form onSubmit={submitWeight} className="space-y-3 border-t border-tg-divider pt-5">
         <h2 className="text-lg font-semibold">Ежедневный замер</h2>
         <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2">
           <label className="block min-w-0">
@@ -153,7 +153,7 @@ export default function ProfileScreen({ profile, onSaveProfile, onAddWeight }) {
 
       {error ? <p role="alert" className="text-sm text-tg-destructive">{error}</p> : null}
 
-      <section className="space-y-3 border-t border-white/5 pt-5">
+      <section className="space-y-3 border-t border-tg-divider pt-5">
         <div className="flex items-baseline justify-between">
           <h2 className="text-lg font-semibold">Изменение веса</h2>
           {entries.length > 0 ? <span className="text-xs text-tg-hint">{entries.length} замеров</span> : null}
@@ -185,7 +185,7 @@ export default function ProfileScreen({ profile, onSaveProfile, onAddWeight }) {
               const previous = recentEntries[index + 1];
               const change = previous ? Number(entry.weight) - Number(previous.weight) : null;
               return (
-                <div key={entry.logged_on} className="flex items-center justify-between border-b border-white/5 py-3">
+                <div key={entry.logged_on} className="flex items-center justify-between border-b border-tg-divider py-3">
                   <span className="text-sm capitalize">{formatDate(entry.logged_on)}</span>
                   <div className="flex items-baseline gap-2">
                     <span className="font-semibold tabular-nums">{formatWeight(entry.weight)} кг</span>

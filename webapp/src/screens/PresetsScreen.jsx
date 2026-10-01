@@ -107,7 +107,7 @@ function PresetCard({ preset, selected, onSelect, onEdit, onDelete }) {
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
             {preset.exercises.map((name) => (
-              <span key={name} className="rounded-full bg-black/25 px-2.5 py-1 text-[12px] text-tg-text/90">
+              <span key={name} className="rounded-full bg-tg-bg px-2.5 py-1 text-[12px] text-tg-text/90">
                 {name}
               </span>
             ))}
@@ -199,14 +199,14 @@ function CreateSplitForm({ initialPreset, onCancel, onSubmit }) {
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder="Название, например «Грудь/трицепс»"
-        className="w-full rounded-xl bg-black/30 px-3 py-3 outline-none placeholder:text-tg-hint"
+        className="w-full rounded-xl bg-tg-bg px-3 py-3 outline-none placeholder:text-tg-hint"
       />
       <label className="block space-y-1.5">
         <span className="text-xs font-medium text-tg-hint">Группа мышц</span>
         <select
           value={categoryId}
           onChange={(event) => setCategoryId(event.target.value)}
-          className="w-full rounded-xl bg-black/30 px-3 py-3 text-tg-text outline-none"
+          className="w-full rounded-xl bg-tg-bg px-3 py-3 text-tg-text outline-none"
         >
           {EXERCISE_CATEGORIES.map((item) => (
             <option key={item.id} value={item.id}>
@@ -221,7 +221,7 @@ function CreateSplitForm({ initialPreset, onCancel, onSubmit }) {
           const added = exercises.some((selected) => selected.name === item.name);
           return (
             <article key={item.name} className="overflow-hidden rounded-lg bg-tg-section">
-              <div className="relative aspect-[4/3] bg-black/25">
+              <div className="relative aspect-[4/3] bg-tg-secondary">
                 <img
                   src={item.image}
                   alt={item.name}
@@ -236,7 +236,7 @@ function CreateSplitForm({ initialPreset, onCancel, onSubmit }) {
                   type="button"
                   disabled={added}
                   onClick={() => addExercise(item)}
-                  className="w-full rounded-lg bg-tg-button px-2 py-2 text-xs font-semibold text-tg-buttonText disabled:bg-black/30 disabled:text-tg-hint"
+                  className="w-full rounded-lg bg-tg-button px-2 py-2 text-xs font-semibold text-tg-buttonText disabled:bg-tg-secondary disabled:text-tg-hint"
                 >
                   {added ? "Добавлено" : "+ Добавить"}
                 </button>
@@ -259,7 +259,7 @@ function CreateSplitForm({ initialPreset, onCancel, onSubmit }) {
               }
             }}
             placeholder="Название упражнения"
-            className="min-w-0 flex-1 rounded-xl bg-black/30 px-3 py-3 outline-none placeholder:text-tg-hint"
+            className="min-w-0 flex-1 rounded-xl bg-tg-bg px-3 py-3 outline-none placeholder:text-tg-hint"
           />
           <button
             type="button"
@@ -276,12 +276,12 @@ function CreateSplitForm({ initialPreset, onCancel, onSubmit }) {
           В сплите: {exercises.length}
         </div>
         {exercises.map((item, index) => (
-          <div key={item.name} className="flex items-center gap-3 border-b border-white/5 py-2">
+          <div key={item.name} className="flex items-center gap-3 border-b border-tg-divider py-2">
             {item.image ? (
               <img
                 src={item.image}
                 alt=""
-                className="h-12 w-12 rounded-lg bg-black/25 object-cover"
+                className="h-12 w-12 rounded-lg bg-tg-secondary object-cover"
                 onError={(event) => event.currentTarget.remove()}
               />
             ) : null}
@@ -303,7 +303,7 @@ function CreateSplitForm({ initialPreset, onCancel, onSubmit }) {
       </p>
       {error ? <p className="text-sm text-tg-destructive">{error}</p> : null}
       <div className="flex gap-2">
-        <button type="button" onClick={onCancel} className="flex-1 rounded-xl bg-black/30 py-3 text-tg-hint">
+        <button type="button" onClick={onCancel} className="flex-1 rounded-xl bg-tg-secondary py-3 text-tg-hint">
           Отмена
         </button>
         <button type="submit" className="flex-1 rounded-xl bg-tg-button py-3 font-semibold text-tg-buttonText">

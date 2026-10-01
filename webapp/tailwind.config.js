@@ -14,6 +14,7 @@ export default {
           button: "var(--tg-button)",
           buttonText: "var(--tg-button-text)",
           destructive: "var(--tg-destructive)",
+          divider: "var(--tg-divider)",
         },
       },
       boxShadow: {
