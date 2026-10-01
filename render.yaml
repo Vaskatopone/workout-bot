@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: workout-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt && cd webapp && npm install && npm run build
+    startCommand: python -m bot.main
+    healthCheckPath: /api/health
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: ALLOW_DEV_AUTH
+        value: "0"

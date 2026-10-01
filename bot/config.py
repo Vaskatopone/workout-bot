@@ -22,7 +22,7 @@ def get_settings() -> Settings:
     database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./workout.db").strip()
     allow_dev_auth = os.getenv("ALLOW_DEV_AUTH", "1").strip() != "0"
     api_host = os.getenv("API_HOST", "0.0.0.0").strip()
-    api_port = int(os.getenv("API_PORT", "8080"))
+    api_port = int(os.getenv("PORT", os.getenv("API_PORT", "8080")))
 
     if not bot_token:
         raise RuntimeError("BOT_TOKEN is not set")

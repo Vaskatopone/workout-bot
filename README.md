@@ -31,3 +31,7 @@ cd webapp && npm run build
 ```
 
 Бот раздаёт `webapp/dist` с того же порта `8080`. В `.env` укажи HTTPS-URL Mini App (`WEBAPP_URL`).
+
+## Render
+
+Для деплоя через Blueprint используй `render.yaml`. Укажи `BOT_TOKEN` и `WEBAPP_URL` в переменных окружения Render. Если сервис уже создан вручную, установи Build Command из `render.yaml` и Start Command `python -m bot.main`; команда `npm` сама по себе не запускает приложение.
