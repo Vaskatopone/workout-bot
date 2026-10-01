@@ -12,7 +12,7 @@ cp .env.example .env
 python -m bot.main
 ```
 
-`/start` сохраняет пользователя и открывает WebApp. API слушает порт `8080`.
+`/start` сохраняет пользователя и открывает WebApp. API слушает порт `8080`. По умолчанию локально используется SQLite.
 
 ## WebApp
 
@@ -35,6 +35,12 @@ cd webapp && npm run build
 ## Render
 
 Для деплоя через Blueprint используй `render.yaml`. Укажи `BOT_TOKEN` и `WEBAPP_URL` в переменных окружения Render. Если сервис уже создан вручную, установи Build Command из `render.yaml` и Start Command `python -m bot.main`; команда `npm` сама по себе не запускает приложение.
+
+### Постоянная база данных
+
+Файловая система Render эфемерна, поэтому SQLite-файл внутри сервиса теряется при пересоздании контейнера. Для бесплатного варианта создай постоянный PostgreSQL-проект в [Neon](https://neon.com/), скопируй connection string и добавь её в Render → **Environment** как `DATABASE_URL`. Используй pooled connection string из Neon; не добавляй её в Git. Neon Free включает до 1 ГБ на проект и автоматически приостанавливает compute при простое, сохраняя данные. Для SQLite на Render нужен платный Persistent Disk.
+
+В `render.yaml` переменная `DATABASE_URL` запрошена без значения. Для уже созданного вручную Render-сервиса добавь её в Dashboard и запусти redeploy. Данные, уже потерянные при предыдущих пересозданиях SQLite-контейнера, восстановить этим изменением нельзя.
 
 ## GitHub Pages
 

@@ -10,5 +10,7 @@ services:
         sync: false
       - key: WEBAPP_URL
         sync: false
+      - key: DATABASE_URL
+        sync: false
       - key: ALLOW_DEV_AUTH
         value: "0"
