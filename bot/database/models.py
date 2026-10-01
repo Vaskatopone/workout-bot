@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -87,3 +87,22 @@ class WorkoutLog(Base):
 
     user: Mapped[User] = relationship(back_populates="logs")
     exercise: Mapped[Exercise] = relationship(back_populates="logs")
+
+
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    current_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class WeightEntry(Base):
+    __tablename__ = "weight_entries"
+    __table_args__ = (UniqueConstraint("user_id", "logged_on", name="uq_weight_entry_user_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    logged_on: Mapped[date] = mapped_column(Date)
+    weight: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

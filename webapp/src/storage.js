@@ -1,5 +1,6 @@
 const LS_PRESETS = "workout.customPresets";
 const LS_HISTORY = "workout.history";
+const LS_PROFILE = "workout.profile";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 function headers() {
@@ -109,4 +110,55 @@ export async function saveWorkout({ logged_on, preset_name, sets }) {
     }
     writeLocal(LS_HISTORY, history);
   }
+}
+
+export async function loadProfile() {
+  try {
+    return await request("/api/profile");
+  } catch {
+    return readLocal(LS_PROFILE, { current_weight: null, target_weight: null, weight_entries: [] });
+  }
+}
+
+export async function saveProfile({ current_weight, target_weight }) {
+  const changes = { current_weight, target_weight };
+  try {
+    return await request("/api/profile", {
+      method: "PUT",
+      body: JSON.stringify(changes),
+    });
+  } catch {
+    const profile = { ...loadLocalProfile(), ...changes };
+    writeLocal(LS_PROFILE, profile);
+    return profile;
+  }
+}
+
+export async function saveWeightEntry({ logged_on, weight }) {
+  try {
+    return await request("/api/weights", {
+      method: "POST",
+      body: JSON.stringify({ logged_on, weight }),
+    });
+  } catch {
+    const profile = loadLocalProfile();
+    const latestDate = profile.weight_entries[0]?.logged_on;
+    const entryIndex = profile.weight_entries.findIndex((entry) => entry.logged_on === logged_on);
+    const entry = { logged_on, weight };
+    if (entryIndex >= 0) profile.weight_entries[entryIndex] = entry;
+    else profile.weight_entries.push(entry);
+    profile.weight_entries.sort((left, right) => right.logged_on.localeCompare(left.logged_on));
+    if (!latestDate || logged_on >= latestDate) profile.current_weight = weight;
+    writeLocal(LS_PROFILE, profile);
+    return profile;
+  }
+}
+
+function loadLocalProfile() {
+  const profile = readLocal(LS_PROFILE, {});
+  return {
+    current_weight: profile.current_weight ?? null,
+    target_weight: profile.target_weight ?? null,
+    weight_entries: profile.weight_entries ?? [],
+  };
 }

@@ -44,3 +44,24 @@ class HistoryDayOut(BaseModel):
     date: date
     preset_name: str | None
     sets: list[SetOut]
+
+
+class WeightEntryOut(BaseModel):
+    logged_on: date
+    weight: float
+
+
+class ProfileOut(BaseModel):
+    current_weight: float | None
+    target_weight: float | None
+    weight_entries: list[WeightEntryOut]
+
+
+class ProfileUpdate(BaseModel):
+    current_weight: float | None = Field(default=None, gt=0, le=500)
+    target_weight: float | None = Field(default=None, gt=0, le=500)
+
+
+class WeightEntryCreate(BaseModel):
+    logged_on: date
+    weight: float = Field(gt=0, le=500)

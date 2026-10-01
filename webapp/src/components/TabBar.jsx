@@ -3,11 +3,12 @@ export default function TabBar({ tab, onChange }) {
     { id: "presets", label: "Сплит", icon: SplitIcon },
     { id: "workout", label: "Тренировка", icon: DumbbellIcon },
     { id: "history", label: "История", icon: HistoryIcon },
+    { id: "profile", label: "Профиль", icon: ProfileIcon },
   ];
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-white/5 bg-tg-secondary/95 backdrop-blur-md">
-      <div className="mx-auto grid max-w-lg grid-cols-3 px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2">
+      <div className="mx-auto grid max-w-lg grid-cols-4 px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-2">
         {items.map((item) => {
           const active = tab === item.id;
           const Icon = item.icon;
@@ -52,6 +53,15 @@ function HistoryIcon({ active }) {
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8}>
       <circle cx="12" cy="12" r="8" />
       <path d="M12 8v5l3 2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ProfileIcon({ active }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20a7 7 0 0 1 14 0" strokeLinecap="round" />
     </svg>
   );
 }

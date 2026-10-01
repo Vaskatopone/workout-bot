@@ -4,7 +4,17 @@ import { BUILTIN_PRESETS } from "./presets.js";
 import PresetsScreen from "./screens/PresetsScreen.jsx";
 import WorkoutScreen from "./screens/WorkoutScreen.jsx";
 import HistoryScreen from "./screens/HistoryScreen.jsx";
-import { createCustomPreset, loadCustomPresets, loadHistory, saveWorkout, todayISO } from "./storage.js";
+import ProfileScreen from "./screens/ProfileScreen.jsx";
+import {
+  createCustomPreset,
+  loadCustomPresets,
+  loadHistory,
+  loadProfile,
+  saveProfile,
+  saveWeightEntry,
+  saveWorkout,
+  todayISO,
+} from "./storage.js";
 import { notify } from "./telegram.js";
 
 function emptyDraft(preset) {
@@ -15,6 +25,7 @@ export default function App() {
   const [tab, setTab] = useState("presets");
   const [custom, setCustom] = useState([]);
   const [history, setHistory] = useState([]);
+  const [profile, setProfile] = useState({ current_weight: null, target_weight: null, weight_entries: [] });
   const [selected, setSelected] = useState(null);
   const [date, setDate] = useState(todayISO());
   const [draft, setDraft] = useState([]);
@@ -23,10 +34,15 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [presets, days] = await Promise.all([loadCustomPresets(), loadHistory()]);
+      const [presets, days, userProfile] = await Promise.all([
+        loadCustomPresets(),
+        loadHistory(),
+        loadProfile(),
+      ]);
       if (cancelled) return;
       setCustom(presets);
       setHistory(days);
+      setProfile(userProfile);
     })();
     return () => {
       cancelled = true;
@@ -90,8 +106,25 @@ export default function App() {
         />
       ),
       history: <HistoryScreen history={history} />,
+      profile: (
+        <ProfileScreen
+          profile={profile}
+          onSaveProfile={async (changes) => {
+            const saved = await saveProfile(changes);
+            setProfile(saved);
+            notify("success");
+            showToast("Профиль сохранён");
+          }}
+          onAddWeight={async (entry) => {
+            const saved = await saveWeightEntry(entry);
+            setProfile(saved);
+            notify("success");
+            showToast("Замер сохранён");
+          }}
+        />
+      ),
     }),
-    [custom, date, draft, history, selected, selectedId],
+    [custom, date, draft, history, profile, selected, selectedId],
   );
 
   return (

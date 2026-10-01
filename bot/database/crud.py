@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from bot.database.models import Exercise, User, WorkoutLog, WorkoutPreset
+from bot.database.models import Exercise, User, UserProfile, WeightEntry, WorkoutLog, WorkoutPreset
 
 
 async def get_or_create_user(
@@ -126,3 +126,83 @@ async def list_history(session: AsyncSession, user_id: int) -> list[WorkoutLog]:
         .order_by(WorkoutLog.logged_on.desc(), WorkoutLog.created_at.asc())
     )
     return list(result.scalars().unique().all())
+
+
+async def get_user_profile(session: AsyncSession, user_id: int) -> dict:
+    profile_result = await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    profile = profile_result.scalar_one_or_none()
+    entries_result = await session.execute(
+        select(WeightEntry)
+        .where(WeightEntry.user_id == user_id)
+        .order_by(WeightEntry.logged_on.desc())
+    )
+    entries = entries_result.scalars().all()
+    return {
+        "current_weight": profile.current_weight if profile else None,
+        "target_weight": profile.target_weight if profile else None,
+        "weight_entries": [{"logged_on": entry.logged_on, "weight": entry.weight} for entry in entries],
+    }
+
+
+async def update_user_profile(
+    session: AsyncSession,
+    user_id: int,
+    current_weight: float | None,
+    target_weight: float | None,
+) -> dict:
+    result = await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    profile = result.scalar_one_or_none()
+    if profile is None:
+        profile = UserProfile(
+            user_id=user_id,
+            current_weight=current_weight,
+            target_weight=target_weight,
+        )
+        session.add(profile)
+    else:
+        profile.current_weight = current_weight
+        profile.target_weight = target_weight
+    await session.commit()
+    return await get_user_profile(session, user_id)
+
+
+async def save_weight_entry(
+    session: AsyncSession,
+    user_id: int,
+    logged_on: date,
+    weight: float,
+) -> dict:
+    latest_date_result = await session.execute(
+        select(WeightEntry.logged_on)
+        .where(WeightEntry.user_id == user_id)
+        .order_by(WeightEntry.logged_on.desc())
+        .limit(1)
+    )
+    latest_date = latest_date_result.scalar_one_or_none()
+    update_current_weight = latest_date is None or logged_on >= latest_date
+
+    profile_result = await session.execute(select(UserProfile).where(UserProfile.user_id == user_id))
+    profile = profile_result.scalar_one_or_none()
+    if profile is None:
+        session.add(
+            UserProfile(
+                user_id=user_id,
+                current_weight=weight if update_current_weight else None,
+            )
+        )
+    elif update_current_weight:
+        profile.current_weight = weight
+
+    entry_result = await session.execute(
+        select(WeightEntry).where(
+            WeightEntry.user_id == user_id,
+            WeightEntry.logged_on == logged_on,
+        )
+    )
+    entry = entry_result.scalar_one_or_none()
+    if entry is None:
+        session.add(WeightEntry(user_id=user_id, logged_on=logged_on, weight=weight))
+    else:
+        entry.weight = weight
+    await session.commit()
+    return await get_user_profile(session, user_id)

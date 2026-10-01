@@ -7,12 +7,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from bot.database.crud import (
     create_preset,
+    get_user_profile,
     get_or_create_user,
     list_history,
     list_presets,
+    save_weight_entry,
     save_workout,
+    update_user_profile,
 )
-from bot.schemas import HistoryDayOut, PresetCreate, PresetOut, SetOut, WorkoutCreate
+from bot.schemas import (
+    HistoryDayOut,
+    PresetCreate,
+    PresetOut,
+    ProfileOut,
+    ProfileUpdate,
+    SetOut,
+    WeightEntryCreate,
+    WorkoutCreate,
+)
 from bot.telegram_webapp import resolve_telegram_user
 
 
@@ -38,6 +50,26 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
     @app.get("/api/health")
     async def health() -> dict:
         return {"ok": True}
+
+    @app.get("/api/profile", response_model=ProfileOut)
+    async def get_profile(ctx=Depends(db_user)) -> ProfileOut:
+        session, user = ctx
+        return await get_user_profile(session, user.id)
+
+    @app.put("/api/profile", response_model=ProfileOut)
+    async def put_profile(payload: ProfileUpdate, ctx=Depends(db_user)) -> ProfileOut:
+        session, user = ctx
+        return await update_user_profile(
+            session,
+            user.id,
+            payload.current_weight,
+            payload.target_weight,
+        )
+
+    @app.post("/api/weights", response_model=ProfileOut)
+    async def post_weight_entry(payload: WeightEntryCreate, ctx=Depends(db_user)) -> ProfileOut:
+        session, user = ctx
+        return await save_weight_entry(session, user.id, payload.logged_on, payload.weight)
 
     @app.get("/api/presets", response_model=list[PresetOut])
     async def get_presets(ctx=Depends(db_user)) -> list[PresetOut]:
