@@ -28,12 +28,27 @@ export default function HistoryScreen({ history }) {
     );
   }
 
+  const totalSets = history.reduce((total, day) => total + day.sets.length, 0);
+  const totalVolume = history.reduce(
+    (total, day) => total + day.sets.reduce((dayTotal, set) => dayTotal + set.weight * set.repetitions, 0),
+    0,
+  );
+
   return (
     <div className="space-y-4">
       <header>
         <h1 className="text-[28px] font-semibold tracking-tight">История</h1>
         <p className="mt-1 text-sm text-tg-hint">Прогресс по дням. Нажми дату, чтобы открыть подходы.</p>
       </header>
+
+      <section aria-label="Сводка прогресса" className="grid grid-cols-3 gap-2">
+        <Stat label="Дней" value={history.length} />
+        <Stat label="Подходов" value={totalSets} />
+        <Stat
+          label="Объём, кг × повторы"
+          value={totalVolume.toLocaleString("ru-RU", { maximumFractionDigits: 1 })}
+        />
+      </section>
 
       {history.map((day) => {
         const open = openDate === day.date;
@@ -75,6 +90,15 @@ export default function HistoryScreen({ history }) {
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function Stat({ label, value }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-tg-section px-3 py-3">
+      <div className="truncate text-lg font-semibold tabular-nums">{value}</div>
+      <div className="mt-1 text-[11px] leading-tight text-tg-hint">{label}</div>
     </div>
   );
 }
