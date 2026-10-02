@@ -147,12 +147,22 @@ function TrainingPlanForm({ plan, presets, onSave }) {
         ))}
         <label className="flex items-center justify-between gap-3 text-sm">
           <span>Время напоминания</span>
-          <input
-            type="time"
-            value={reminderTime}
-            onChange={(event) => setReminderTime(event.target.value)}
-            className="rounded-lg bg-tg-bg px-3 py-2"
-          />
+          <span className="flex items-center gap-2">
+            <input
+              type="time"
+              value={reminderTime}
+              onChange={(event) => setReminderTime(event.target.value)}
+              className="rounded-lg bg-tg-bg px-3 py-2"
+            />
+            <button
+              type="button"
+              onClick={() => setReminderTime("")}
+              disabled={!reminderTime}
+              className="text-xs text-tg-link disabled:text-tg-hint"
+            >
+              Отключить
+            </button>
+          </span>
         </label>
         <p className="text-xs text-tg-hint">
           Часовой пояс устройства: {Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}.
