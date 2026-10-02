@@ -12,9 +12,17 @@ import {
   loadCustomPresets,
   loadHistory,
   loadProfile,
+  loadActiveWorkoutDraft,
+  loadTrainingPlan,
   saveProfile,
   saveWeightEntry,
   saveWorkout,
+  saveActiveWorkoutDraft,
+  clearActiveWorkoutDraft,
+  saveTrainingPlan,
+  updateWorkoutDay,
+  updateWorkoutSet,
+  deleteWorkoutSet,
   todayISO,
   updateCustomPreset,
 } from "./storage.js";
@@ -39,14 +47,16 @@ function emptyDraft(preset, history, workoutDate) {
 }
 
 export default function App() {
-  const [tab, setTab] = useState("presets");
+  const [initialWorkout] = useState(loadActiveWorkoutDraft);
+  const [tab, setTab] = useState(() => initialWorkout ? "workout" : "presets");
   const [custom, setCustom] = useState([]);
   const [history, setHistory] = useState([]);
   const [profile, setProfile] = useState({ current_weight: null, target_weight: null, weight_entries: [] });
-  const [selected, setSelected] = useState(null);
-  const [date, setDate] = useState(todayISO());
-  const [draft, setDraft] = useState([]);
-  const [startedAt, setStartedAt] = useState(null);
+  const [trainingPlan, setTrainingPlan] = useState({ timezone: "UTC", reminder_time: null, days: [] });
+  const [selected, setSelected] = useState(() => initialWorkout?.preset ?? null);
+  const [date, setDate] = useState(() => initialWorkout?.date ?? todayISO());
+  const [draft, setDraft] = useState(() => initialWorkout?.draft ?? []);
+  const [startedAt, setStartedAt] = useState(() => initialWorkout?.startedAt ?? null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [toast, setToast] = useState("");
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -55,15 +65,17 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const [presets, days, userProfile] = await Promise.all([
+        const [presets, days, userProfile, plan] = await Promise.all([
           loadCustomPresets(),
           loadHistory(),
           loadProfile(),
+          loadTrainingPlan(),
         ]);
         if (cancelled) return;
         setCustom(presets);
         setHistory(days);
         setProfile(userProfile);
+        setTrainingPlan(plan);
       } finally {
         if (!cancelled) setIsLoadingData(false);
       }
@@ -72,6 +84,14 @@ export default function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (selected && startedAt !== null) {
+      saveActiveWorkoutDraft({ preset: selected, date, draft, startedAt });
+    } else {
+      clearActiveWorkoutDraft();
+    }
+  }, [date, draft, selected, startedAt]);
 
   useEffect(() => {
     if (startedAt === null) return undefined;
@@ -94,7 +114,19 @@ export default function App() {
         <PresetsScreen
           builtin={BUILTIN_PRESETS}
           custom={custom}
+          trainingPlan={trainingPlan}
           selectedId={selectedId}
+          onSavePlan={async (plan) => {
+            const saved = await saveTrainingPlan(plan);
+            setTrainingPlan(saved);
+            if (saved.local_only) {
+              notify("error");
+              showToast("План сохранён локально; для напоминаний нужно подключение");
+            } else {
+              notify("success");
+              showToast("План сохранён");
+            }
+          }}
           onSelect={(preset) => {
             const workoutDate = todayISO();
             setSelected(preset);
@@ -170,6 +202,7 @@ export default function App() {
               sets,
               duration_seconds: durationSeconds,
             });
+            clearActiveWorkoutDraft();
             const days = await loadHistory();
             setHistory(days);
             setSelected(null);
@@ -186,6 +219,21 @@ export default function App() {
       history: (
         <HistoryScreen
           history={history}
+          onEditDay={async (day, changes) => {
+            setHistory(await updateWorkoutDay(day.date, changes, history));
+            notify("success");
+            showToast("Тренировка обновлена");
+          }}
+          onEditSet={async (day, set, changes) => {
+            setHistory(await updateWorkoutSet(day.date, set, changes, history));
+            notify("success");
+            showToast("Подход обновлён");
+          }}
+          onDeleteSet={async (day, set) => {
+            setHistory(await deleteWorkoutSet(day.date, set, history));
+            notify("success");
+            showToast("Подход удалён");
+          }}
           onDelete={async (loggedOn) => {
             const confirmed = await confirmAction("Удалить тренировку и все её подходы? Отменить это действие нельзя.");
             if (!confirmed) return;
@@ -213,7 +261,7 @@ export default function App() {
         />
       ),
     }),
-    [custom, date, draft, elapsedSeconds, history, profile, selected, selectedId, startedAt],
+    [custom, date, draft, elapsedSeconds, history, profile, selected, selectedId, startedAt, trainingPlan],
   );
 
   return (

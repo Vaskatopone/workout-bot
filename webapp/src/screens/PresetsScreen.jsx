@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EXERCISE_CATEGORIES } from "../presets.js";
 import { haptic } from "../telegram.js";
 
-export default function PresetsScreen({ builtin, custom, selectedId, onSelect, onCreate, onUpdate, onDelete }) {
+export default function PresetsScreen({ builtin, custom, trainingPlan, selectedId, onSelect, onCreate, onUpdate, onDelete, onSavePlan }) {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
   const [showBuiltin, setShowBuiltin] = useState(false);
@@ -43,6 +43,8 @@ export default function PresetsScreen({ builtin, custom, selectedId, onSelect, o
           }}
         />
       ) : null}
+
+      <TrainingPlanForm plan={trainingPlan} presets={[...builtin, ...custom]} onSave={onSavePlan} />
 
       {custom.length > 0 ? (
         <section className="space-y-2">
@@ -91,6 +93,77 @@ export default function PresetsScreen({ builtin, custom, selectedId, onSelect, o
         ) : null}
       </section>
     </div>
+  );
+}
+
+const WEEKDAYS = ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"];
+
+function TrainingPlanForm({ plan, presets, onSave }) {
+  const [days, setDays] = useState({});
+  const [reminderTime, setReminderTime] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setDays(Object.fromEntries(plan.days.map((item) => [item.weekday, item.preset_name])));
+    setReminderTime(plan.reminder_time ?? "");
+  }, [plan]);
+
+  return (
+    <details className="rounded-2xl bg-tg-section p-4">
+      <summary className="cursor-pointer text-[17px] font-semibold">План тренировок и напоминания</summary>
+      <form
+        className="mt-4 space-y-3"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          setError("");
+          try {
+            await onSave({
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+              reminder_time: reminderTime || null,
+              days: Object.entries(days)
+                .filter(([, presetName]) => presetName)
+                .map(([weekday, preset_name]) => ({ weekday: Number(weekday), preset_name })),
+            });
+          } catch {
+            setError("Не удалось сохранить план. Проверь подключение и попробуй ещё раз.");
+          }
+        }}
+      >
+        <p className="text-sm text-tg-hint">Назначь сплит на дни недели. В выбранное время бот напомнит о тренировке.</p>
+        {WEEKDAYS.map((weekday, index) => (
+          <label key={weekday} className="flex items-center gap-3 text-sm">
+            <span className="w-28 shrink-0">{weekday}</span>
+            <select
+              value={days[index] ?? ""}
+              onChange={(event) => setDays((current) => ({ ...current, [index]: event.target.value }))}
+              className="min-w-0 flex-1 rounded-lg bg-tg-bg px-2 py-2"
+            >
+              <option value="">Без тренировки</option>
+              {presets.map((preset) => (
+                <option key={preset.id} value={preset.name}>{preset.name}</option>
+              ))}
+            </select>
+          </label>
+        ))}
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>Время напоминания</span>
+          <input
+            type="time"
+            value={reminderTime}
+            onChange={(event) => setReminderTime(event.target.value)}
+            className="rounded-lg bg-tg-bg px-3 py-2"
+          />
+        </label>
+        <p className="text-xs text-tg-hint">
+          Часовой пояс устройства: {Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"}.
+          Оставь время пустым, чтобы отключить напоминания.
+        </p>
+        {error ? <p role="alert" className="text-sm text-tg-destructive">{error}</p> : null}
+        <button type="submit" className="w-full rounded-xl bg-tg-button py-3 font-semibold text-tg-buttonText">
+          Сохранить план
+        </button>
+      </form>
+    </details>
   );
 }
 

@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,10 +11,12 @@ from bot.database.models import (
     HiddenPresetExercise,
     User,
     UserProfile,
+    UserTrainingSettings,
     WeightEntry,
     WorkoutDuration,
     WorkoutLog,
     WorkoutPreset,
+    WeeklyPlanEntry,
 )
 
 
@@ -273,6 +276,116 @@ async def list_history(session: AsyncSession, user_id: int) -> list[WorkoutLog]:
     return list(result.scalars().unique().all())
 
 
+async def update_workout_set(
+    session: AsyncSession,
+    user_id: int,
+    set_id: int,
+    weight: float,
+    repetitions: int,
+) -> bool:
+    result = await session.execute(
+        select(WorkoutLog).where(WorkoutLog.id == set_id, WorkoutLog.user_id == user_id)
+    )
+    workout_set = result.scalar_one_or_none()
+    if workout_set is None:
+        return False
+    workout_set.weight = weight
+    workout_set.repetitions = repetitions
+    await session.commit()
+    return True
+
+
+async def delete_workout_set(session: AsyncSession, user_id: int, set_id: int) -> bool:
+    result = await session.execute(
+        select(WorkoutLog).where(WorkoutLog.id == set_id, WorkoutLog.user_id == user_id)
+    )
+    workout_set = result.scalar_one_or_none()
+    if workout_set is None:
+        return False
+    workout_date = workout_set.logged_on
+    await session.delete(workout_set)
+    remaining_result = await session.execute(
+        select(WorkoutLog.id).where(
+            WorkoutLog.user_id == user_id,
+            WorkoutLog.logged_on == workout_date,
+        ).limit(1)
+    )
+    if remaining_result.scalar_one_or_none() is None:
+        duration_result = await session.execute(
+            select(WorkoutDuration).where(
+                WorkoutDuration.user_id == user_id,
+                WorkoutDuration.logged_on == workout_date,
+            )
+        )
+        duration = duration_result.scalar_one_or_none()
+        if duration is not None:
+            await session.delete(duration)
+    await session.commit()
+    return True
+
+
+async def update_workout_day(
+    session: AsyncSession,
+    user_id: int,
+    logged_on: date,
+    new_logged_on: date,
+    duration_seconds: int,
+) -> bool:
+    logs_result = await session.execute(
+        select(WorkoutLog).where(
+            WorkoutLog.user_id == user_id,
+            WorkoutLog.logged_on == logged_on,
+        )
+    )
+    logs = list(logs_result.scalars().all())
+    if not logs:
+        return False
+
+    duration_result = await session.execute(
+        select(WorkoutDuration).where(
+            WorkoutDuration.user_id == user_id,
+            WorkoutDuration.logged_on == logged_on,
+        )
+    )
+    old_duration = duration_result.scalar_one_or_none()
+    destination_result = await session.execute(
+        select(WorkoutDuration).where(
+            WorkoutDuration.user_id == user_id,
+            WorkoutDuration.logged_on == new_logged_on,
+        )
+    )
+    destination_duration = destination_result.scalar_one_or_none() if new_logged_on != logged_on else old_duration
+
+    for workout_set in logs:
+        workout_set.logged_on = new_logged_on
+    if new_logged_on == logged_on:
+        if old_duration is None:
+            session.add(
+                WorkoutDuration(
+                    user_id=user_id,
+                    logged_on=logged_on,
+                    duration_seconds=duration_seconds,
+                )
+            )
+        else:
+            old_duration.duration_seconds = duration_seconds
+    else:
+        if old_duration is not None:
+            await session.delete(old_duration)
+        if destination_duration is None:
+            session.add(
+                WorkoutDuration(
+                    user_id=user_id,
+                    logged_on=new_logged_on,
+                    duration_seconds=duration_seconds,
+                )
+            )
+        else:
+            destination_duration.duration_seconds += duration_seconds
+    await session.commit()
+    return True
+
+
 async def list_workout_durations(session: AsyncSession, user_id: int) -> dict[date, int]:
     result = await session.execute(
         select(WorkoutDuration.logged_on, WorkoutDuration.duration_seconds).where(
@@ -280,6 +393,108 @@ async def list_workout_durations(session: AsyncSession, user_id: int) -> dict[da
         )
     )
     return {logged_on: duration_seconds for logged_on, duration_seconds in result.all()}
+
+
+async def get_training_plan(session: AsyncSession, user_id: int) -> dict:
+    settings_result = await session.execute(
+        select(UserTrainingSettings).where(UserTrainingSettings.user_id == user_id)
+    )
+    settings = settings_result.scalar_one_or_none()
+    days_result = await session.execute(
+        select(WeeklyPlanEntry).where(WeeklyPlanEntry.user_id == user_id).order_by(WeeklyPlanEntry.weekday)
+    )
+    return {
+        "timezone": settings.timezone if settings else "UTC",
+        "reminder_time": settings.reminder_time if settings else None,
+        "days": [
+            {"weekday": day.weekday, "preset_name": day.preset_name}
+            for day in days_result.scalars().all()
+        ],
+    }
+
+
+async def update_training_plan(
+    session: AsyncSession,
+    user_id: int,
+    timezone_name: str,
+    reminder_time: str | None,
+    days: list[dict],
+) -> dict:
+    settings_result = await session.execute(
+        select(UserTrainingSettings).where(UserTrainingSettings.user_id == user_id)
+    )
+    settings = settings_result.scalar_one_or_none()
+    if settings is None:
+        settings = UserTrainingSettings(user_id=user_id, timezone=timezone_name, reminder_time=reminder_time)
+        session.add(settings)
+    else:
+        settings.timezone = timezone_name
+        settings.reminder_time = reminder_time
+        settings.last_reminded_on = None
+
+    existing_result = await session.execute(
+        select(WeeklyPlanEntry).where(WeeklyPlanEntry.user_id == user_id)
+    )
+    existing = {entry.weekday: entry for entry in existing_result.scalars().all()}
+    requested = {day["weekday"]: day["preset_name"].strip() for day in days}
+    for weekday, entry in existing.items():
+        if weekday not in requested:
+            await session.delete(entry)
+        else:
+            entry.preset_name = requested[weekday]
+    for weekday, preset_name in requested.items():
+        if weekday not in existing:
+            session.add(WeeklyPlanEntry(
+                user_id=user_id,
+                weekday=weekday,
+                preset_name=preset_name,
+            ))
+    await session.commit()
+    return await get_training_plan(session, user_id)
+
+
+async def list_due_training_reminders(
+    session: AsyncSession,
+    now: datetime | None = None,
+) -> list[dict]:
+    current = now or datetime.now(timezone.utc)
+    result = await session.execute(
+        select(User.telegram_id, User.first_name, UserTrainingSettings, WeeklyPlanEntry)
+        .join(UserTrainingSettings, UserTrainingSettings.user_id == User.id)
+        .join(WeeklyPlanEntry, WeeklyPlanEntry.user_id == User.id)
+        .where(UserTrainingSettings.reminder_time.is_not(None))
+    )
+    due = []
+    for telegram_id, first_name, settings, plan in result.all():
+        local_now = current.astimezone(ZoneInfo(settings.timezone))
+        if plan.weekday != local_now.weekday() or settings.last_reminded_on == local_now.date():
+            continue
+        scheduled = time.fromisoformat(settings.reminder_time)
+        scheduled_at = datetime.combine(local_now.date(), scheduled, tzinfo=local_now.tzinfo)
+        if timedelta(0) <= local_now - scheduled_at <= timedelta(minutes=5):
+            due.append({
+                "telegram_id": telegram_id,
+                "first_name": first_name,
+                "preset_name": plan.preset_name,
+                "local_date": local_now.date(),
+            })
+    return due
+
+
+async def mark_training_reminder_processed(
+    session: AsyncSession,
+    telegram_id: int,
+    local_date: date,
+) -> None:
+    result = await session.execute(
+        select(UserTrainingSettings)
+        .join(User, UserTrainingSettings.user_id == User.id)
+        .where(User.telegram_id == telegram_id)
+    )
+    settings = result.scalar_one_or_none()
+    if settings is not None:
+        settings.last_reminded_on = local_date
+        await session.commit()
 
 
 async def delete_workout_day(session: AsyncSession, user_id: int, logged_on: date) -> None:

@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 from datetime import date
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,6 +13,7 @@ from bot.database.crud import (
     delete_workout_day,
     get_user_profile,
     get_or_create_user,
+    get_training_plan,
     hide_preset,
     list_history,
     list_presets,
@@ -19,8 +21,12 @@ from bot.database.crud import (
     list_workout_durations,
     save_weight_entry,
     save_workout,
+    delete_workout_set,
     update_user_profile,
     update_preset,
+    update_training_plan,
+    update_workout_day,
+    update_workout_set,
 )
 from bot.schemas import (
     HistoryDayOut,
@@ -30,7 +36,11 @@ from bot.schemas import (
     ProfileOut,
     ProfileUpdate,
     SetOut,
+    SetUpdate,
+    TrainingPlanOut,
+    TrainingPlanUpdate,
     WeightEntryCreate,
+    WorkoutDayUpdate,
     WorkoutCreate,
 )
 from bot.telegram_webapp import resolve_telegram_user
@@ -72,6 +82,26 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
             user.id,
             payload.current_weight,
             payload.target_weight,
+        )
+
+    @app.get("/api/training-plan", response_model=TrainingPlanOut)
+    async def get_plan(ctx=Depends(db_user)) -> TrainingPlanOut:
+        session, user = ctx
+        return await get_training_plan(session, user.id)
+
+    @app.put("/api/training-plan", response_model=TrainingPlanOut)
+    async def put_plan(payload: TrainingPlanUpdate, ctx=Depends(db_user)) -> TrainingPlanOut:
+        session, user = ctx
+        try:
+            ZoneInfo(payload.timezone)
+        except ZoneInfoNotFoundError as error:
+            raise HTTPException(status_code=422, detail="Unknown timezone") from error
+        return await update_training_plan(
+            session,
+            user.id,
+            payload.timezone,
+            payload.reminder_time,
+            [day.model_dump() for day in payload.days],
         )
 
     @app.post("/api/weights", response_model=ProfileOut)
@@ -157,6 +187,7 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
         for log in logs:
             grouped[log.logged_on].append(
                 SetOut(
+                    id=log.id,
                     exercise=log.exercise.name,
                     weight=log.weight,
                     repetitions=log.repetitions,
@@ -177,6 +208,47 @@ def create_api(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
     async def delete_history_day(logged_on: date, ctx=Depends(db_user)) -> Response:
         session, user = ctx
         await delete_workout_day(session, user.id, logged_on)
+        return Response(status_code=204)
+
+    @app.put("/api/history/{logged_on}", status_code=204)
+    async def put_history_day(
+        logged_on: date,
+        payload: WorkoutDayUpdate,
+        ctx=Depends(db_user),
+    ) -> Response:
+        session, user = ctx
+        if not await update_workout_day(
+            session,
+            user.id,
+            logged_on,
+            payload.logged_on,
+            payload.duration_seconds,
+        ):
+            raise HTTPException(status_code=404, detail="Workout not found")
+        return Response(status_code=204)
+
+    @app.put("/api/workout-sets/{set_id}", status_code=204)
+    async def put_workout_set(
+        set_id: int,
+        payload: SetUpdate,
+        ctx=Depends(db_user),
+    ) -> Response:
+        session, user = ctx
+        if not await update_workout_set(
+            session,
+            user.id,
+            set_id,
+            payload.weight,
+            payload.repetitions,
+        ):
+            raise HTTPException(status_code=404, detail="Workout set not found")
+        return Response(status_code=204)
+
+    @app.delete("/api/workout-sets/{set_id}", status_code=204)
+    async def remove_workout_set(set_id: int, ctx=Depends(db_user)) -> Response:
+        session, user = ctx
+        if not await delete_workout_set(session, user.id, set_id):
+            raise HTTPException(status_code=404, detail="Workout set not found")
         return Response(status_code=204)
 
     @app.post("/api/workouts")

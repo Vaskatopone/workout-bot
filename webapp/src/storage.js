@@ -1,7 +1,17 @@
 const LS_PRESETS = "workout.customPresets";
 const LS_HISTORY = "workout.history";
 const LS_PROFILE = "workout.profile";
+const LS_ACTIVE_WORKOUT = "workout.activeWorkout";
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+
+function activeWorkoutKey() {
+  const userId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id ?? "guest";
+  return `${LS_ACTIVE_WORKOUT}.${userId}`;
+}
+
+function localSetId() {
+  return `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function headers() {
   const initData = window.Telegram?.WebApp?.initData;
@@ -123,7 +133,18 @@ export async function loadHistory() {
   try {
     return await request("/api/history");
   } catch {
-    return readLocal(LS_HISTORY, []);
+    const history = readLocal(LS_HISTORY, []);
+    let changed = false;
+    for (const day of history) {
+      for (const set of day.sets) {
+        if (set.id == null) {
+          set.id = localSetId();
+          changed = true;
+        }
+      }
+    }
+    if (changed) writeLocal(LS_HISTORY, history);
+    return history;
   }
 }
 
@@ -139,7 +160,12 @@ export async function deleteWorkoutDay(logged_on, currentHistory) {
 }
 
 export async function saveWorkout({ logged_on, preset_name, sets, duration_seconds = 0 }) {
-  const entry = { date: logged_on, preset_name, sets, duration_seconds };
+  const entry = {
+    date: logged_on,
+    preset_name,
+    sets: sets.map((set) => ({ ...set, id: localSetId() })),
+    duration_seconds,
+  };
   try {
     await request("/api/workouts", {
       method: "POST",
@@ -150,12 +176,127 @@ export async function saveWorkout({ logged_on, preset_name, sets, duration_secon
     const existing = history.find((day) => day.date === logged_on);
     if (existing) {
       existing.preset_name = preset_name;
-      existing.sets = [...existing.sets, ...sets];
+      existing.sets = [
+        ...existing.sets.map((set) => set.id == null ? { ...set, id: localSetId() } : set),
+        ...entry.sets,
+      ];
       existing.duration_seconds = (existing.duration_seconds ?? 0) + duration_seconds;
     } else {
       history.unshift(entry);
     }
     writeLocal(LS_HISTORY, history);
+  }
+}
+
+export function loadActiveWorkoutDraft() {
+  return readLocal(activeWorkoutKey(), null);
+}
+
+export function saveActiveWorkoutDraft(draft) {
+  writeLocal(activeWorkoutKey(), draft);
+}
+
+export function clearActiveWorkoutDraft() {
+  localStorage.removeItem(activeWorkoutKey());
+}
+
+export async function updateWorkoutSet(logged_on, set, changes, currentHistory) {
+  try {
+    if (typeof set.id === "number") {
+      await request(`/api/workout-sets/${set.id}`, {
+        method: "PUT",
+        body: JSON.stringify(changes),
+      });
+      return await loadHistory();
+    }
+  } catch {
+    // Fall back to the local history when the API is unavailable.
+  }
+  const history = currentHistory.map((day) => day.date !== logged_on ? day : {
+    ...day,
+    sets: day.sets.map((item) => item.id === set.id ? { ...item, ...changes } : item),
+  });
+  writeLocal(LS_HISTORY, history);
+  return history;
+}
+
+export async function deleteWorkoutSet(logged_on, set, currentHistory) {
+  try {
+    if (typeof set.id === "number") {
+      await request(`/api/workout-sets/${set.id}`, { method: "DELETE" });
+      return await loadHistory();
+    }
+  } catch {
+    // Fall back to the local history when the API is unavailable.
+  }
+  const history = currentHistory
+    .map((day) => day.date !== logged_on ? day : {
+      ...day,
+      sets: day.sets.filter((item) => item.id !== set.id),
+    })
+    .filter((day) => day.sets.length > 0);
+  writeLocal(LS_HISTORY, history);
+  return history;
+}
+
+export async function updateWorkoutDay(logged_on, changes, currentHistory) {
+  try {
+    await request(`/api/history/${logged_on}`, {
+      method: "PUT",
+      body: JSON.stringify(changes),
+    });
+    return await loadHistory();
+  } catch {
+    const source = currentHistory.find((day) => day.date === logged_on);
+    const destination = currentHistory.find((day) => day.date === changes.logged_on);
+    if (logged_on === changes.logged_on) {
+      const history = currentHistory.map((day) => day.date === logged_on
+        ? { ...day, duration_seconds: changes.duration_seconds }
+        : day);
+      writeLocal(LS_HISTORY, history);
+      return history;
+    }
+    const history = currentHistory
+      .filter((day) => day.date !== logged_on)
+      .map((day) => day.date !== changes.logged_on || !source ? day : {
+        ...day,
+        sets: [...day.sets, ...source.sets],
+        duration_seconds: (day.duration_seconds ?? 0) + changes.duration_seconds,
+      });
+    if (!destination && source) {
+      history.push({
+        ...source,
+        date: changes.logged_on,
+        duration_seconds: changes.duration_seconds,
+      });
+    }
+    history.sort((left, right) => right.date.localeCompare(left.date));
+    writeLocal(LS_HISTORY, history);
+    return history;
+  }
+}
+
+export async function loadTrainingPlan() {
+  try {
+    return await request("/api/training-plan");
+  } catch {
+    return readLocal("workout.trainingPlan", {
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      reminder_time: null,
+      days: [],
+    });
+  }
+}
+
+export async function saveTrainingPlan(plan) {
+  try {
+    return await request("/api/training-plan", {
+      method: "PUT",
+      body: JSON.stringify(plan),
+    });
+  } catch {
+    writeLocal("workout.trainingPlan", plan);
+    return { ...plan, local_only: true };
   }
 }
 

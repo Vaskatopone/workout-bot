@@ -140,3 +140,22 @@ class WeightEntry(Base):
     logged_on: Mapped[date] = mapped_column(Date)
     weight: Mapped[float] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserTrainingSettings(Base):
+    __tablename__ = "user_training_settings"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    timezone: Mapped[str] = mapped_column(String(64), default="UTC")
+    reminder_time: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    last_reminded_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class WeeklyPlanEntry(Base):
+    __tablename__ = "weekly_plan_entries"
+    __table_args__ = (UniqueConstraint("user_id", "weekday", name="uq_weekly_plan_user_weekday"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    weekday: Mapped[int] = mapped_column(Integer)
+    preset_name: Mapped[str] = mapped_column(String(128))
