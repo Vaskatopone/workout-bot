@@ -49,19 +49,24 @@ export default function App() {
   const [startedAt, setStartedAt] = useState(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [toast, setToast] = useState("");
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [presets, days, userProfile] = await Promise.all([
-        loadCustomPresets(),
-        loadHistory(),
-        loadProfile(),
-      ]);
-      if (cancelled) return;
-      setCustom(presets);
-      setHistory(days);
-      setProfile(userProfile);
+      try {
+        const [presets, days, userProfile] = await Promise.all([
+          loadCustomPresets(),
+          loadHistory(),
+          loadProfile(),
+        ]);
+        if (cancelled) return;
+        setCustom(presets);
+        setHistory(days);
+        setProfile(userProfile);
+      } finally {
+        if (!cancelled) setIsLoadingData(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -214,6 +219,12 @@ export default function App() {
   return (
     <div className="min-h-[100dvh] bg-tg-bg text-tg-text">
       <main className="mx-auto max-w-lg px-4 pb-28 pt-[max(16px,env(safe-area-inset-top))]">
+        {isLoadingData ? (
+          <div role="status" className="mb-4 flex items-center gap-2 rounded-xl bg-tg-section px-3 py-2 text-sm text-tg-hint">
+            <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-tg-button border-t-transparent" />
+            Подключаемся к базе данных…
+          </div>
+        ) : null}
         {screens[tab]}
       </main>
       <TabBar tab={tab} onChange={setTab} />
