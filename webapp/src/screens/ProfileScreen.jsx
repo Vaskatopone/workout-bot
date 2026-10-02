@@ -11,7 +11,11 @@ function formatDate(value) {
 }
 
 function formatWeight(value) {
-  return Number(value).toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+  return Number(value).toLocaleString("ru-RU", { maximumFractionDigits: 3 });
+}
+
+function parseWeight(value) {
+  return Number(value.trim().replace(",", "."));
 }
 
 export default function ProfileScreen({ profile, onSaveProfile, onAddWeight }) {
@@ -40,8 +44,8 @@ export default function ProfileScreen({ profile, onSaveProfile, onAddWeight }) {
 
   async function submitProfile(event) {
     event.preventDefault();
-    const parsedCurrent = currentWeight === "" ? null : Number(currentWeight);
-    const parsedTarget = targetWeight === "" ? null : Number(targetWeight);
+    const parsedCurrent = currentWeight === "" ? null : parseWeight(currentWeight);
+    const parsedTarget = targetWeight === "" ? null : parseWeight(targetWeight);
     if ([parsedCurrent, parsedTarget].some((value) => value !== null && (!Number.isFinite(value) || value <= 0 || value > 500))) {
       setError("Укажи вес от 0,1 до 500 кг");
       return;
@@ -52,7 +56,7 @@ export default function ProfileScreen({ profile, onSaveProfile, onAddWeight }) {
 
   async function submitWeight(event) {
     event.preventDefault();
-    const parsedWeight = Number(entryWeight.replace(",", "."));
+    const parsedWeight = parseWeight(entryWeight);
     if (!Number.isFinite(parsedWeight) || parsedWeight <= 0 || parsedWeight > 500 || !entryDate) {
       setError("Укажи дату и вес от 0,1 до 500 кг");
       return;
@@ -221,11 +225,8 @@ function WeightInput({ label, value, onChange, placeholder = "70" }) {
     <label className="block min-w-0">
       <span className="mb-1 block text-[11px] uppercase text-tg-hint">{label}</span>
       <input
-        type="number"
+        type="text"
         inputMode="decimal"
-        min="0.1"
-        max="500"
-        step="0.1"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

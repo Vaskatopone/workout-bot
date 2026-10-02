@@ -5,6 +5,7 @@ import { haptic } from "../telegram.js";
 export default function PresetsScreen({ builtin, custom, selectedId, onSelect, onCreate, onUpdate, onDelete }) {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [showBuiltin, setShowBuiltin] = useState(false);
 
   const closeForm = () => {
     setCreating(false);
@@ -64,15 +65,30 @@ export default function PresetsScreen({ builtin, custom, selectedId, onSelect, o
       ) : null}
 
       <section className="space-y-2">
-        <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-tg-hint">Встроенные</h2>
-        {builtin.map((preset) => (
-          <PresetCard
-            key={preset.id}
-            preset={preset}
-            selected={selectedId === preset.id}
-            onSelect={onSelect}
-          />
-        ))}
+        <div className="flex items-center justify-between px-1">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-tg-hint">Встроенные</h2>
+          <button
+            type="button"
+            aria-expanded={showBuiltin}
+            aria-controls="builtin-presets"
+            onClick={() => setShowBuiltin((visible) => !visible)}
+            className="text-sm font-medium text-tg-link"
+          >
+            {showBuiltin ? "Скрыть" : "Показать"}
+          </button>
+        </div>
+        {showBuiltin ? (
+          <div id="builtin-presets" className="space-y-2">
+            {builtin.map((preset) => (
+              <PresetCard
+                key={preset.id}
+                preset={preset}
+                selected={selectedId === preset.id}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
+        ) : null}
       </section>
     </div>
   );
