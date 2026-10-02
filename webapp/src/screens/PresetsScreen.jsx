@@ -54,6 +54,7 @@ export default function PresetsScreen({ builtin, custom, trainingPlan, selectedI
               key={preset.id}
               preset={preset}
               selected={selectedId === preset.id}
+              collapsible
               onSelect={onSelect}
               onEdit={() => setEditing(preset)}
               onDelete={async () => {
@@ -177,7 +178,9 @@ function TrainingPlanForm({ plan, presets, onSave }) {
   );
 }
 
-function PresetCard({ preset, selected, onSelect, onEdit, onDelete }) {
+function PresetCard({ preset, selected, onSelect, onEdit, onDelete, collapsible = false }) {
+  const [expanded, setExpanded] = useState(!collapsible);
+
   return (
     <article
       className={`rounded-2xl bg-tg-section p-4 shadow-card ${
@@ -204,7 +207,10 @@ function PresetCard({ preset, selected, onSelect, onEdit, onDelete }) {
               </span>
             ) : null}
           </div>
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div
+            id={`preset-exercises-${preset.id}`}
+            className={`mt-3 flex flex-wrap gap-1.5 ${collapsible && !expanded ? "hidden" : ""}`}
+          >
             {preset.exercises.map((name) => (
               <span key={name} className="rounded-full bg-tg-bg px-2.5 py-1 text-[12px] text-tg-text/90">
                 {name}
@@ -212,6 +218,22 @@ function PresetCard({ preset, selected, onSelect, onEdit, onDelete }) {
             ))}
           </div>
         </button>
+        {collapsible ? (
+          <button
+            type="button"
+            aria-label={`${expanded ? "Скрыть" : "Показать"} упражнения сплита ${preset.name}`}
+            aria-expanded={expanded}
+            aria-controls={`preset-exercises-${preset.id}`}
+            title={`${expanded ? "Скрыть" : "Показать"} упражнения`}
+            onClick={() => {
+              haptic("light");
+              setExpanded((visible) => !visible);
+            }}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-tg-hint hover:bg-black/20 hover:text-tg-link"
+          >
+            <ChevronIcon expanded={expanded} />
+          </button>
+        ) : null}
         {onEdit && onDelete ? (
           <div className="flex shrink-0 flex-col gap-1">
             <button
@@ -425,6 +447,25 @@ function DeleteIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m4 4v6m6-6v6" />
+    </svg>
+  );
+}
+
+function ChevronIcon({ expanded }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+    >
+      <path d="m6 9 6 6 6-6" />
     </svg>
   );
 }
